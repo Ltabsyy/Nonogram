@@ -3,10 +3,12 @@
 #include <time.h>
 #include <windows.h>
 
-int isMine[20][15];
-int isOpen[20][15];
-int rowNumber[20][8];
-int columnNumber[10][15];
+#define RefreshCycle 50
+
+int isMine[20][20];
+int isOpen[20][20];
+int rowNumber[20][10];
+int columnNumber[10][20];
 
 int heightOfBoard = 6;
 int widthOfBoard = 6;
@@ -40,6 +42,12 @@ void showCursor(int visible)//显示或隐藏光标
 	CONSOLE_CURSOR_INFO cursor_info = {20, visible};
 	SetConsoleCursorInfo(GetStdHandle(STD_OUTPUT_HANDLE), &cursor_info);
 }
+void ColorNumber(int number, int color)//输出彩色数字
+{
+	SetConsoleTextAttribute(GetStdHandle(STD_OUTPUT_HANDLE), color);
+	printf("%d", number);
+	SetConsoleTextAttribute(GetStdHandle(STD_OUTPUT_HANDLE), 0x07);
+}
 void SetConsoleMouseMode(int mode)//键鼠操作切换
 {
 	if(mode == 1)//切换到鼠标
@@ -70,6 +78,20 @@ void PrintBoard(int mode)
 			{
 				printf("  ");
 			}
+			else if(columnNumber[r][c] == heightOfBoard)
+			{
+				if(columnNumber[r][c] < 10) printf(" ");
+				ColorNumber(columnNumber[r][c], 0x01);
+			}
+			else if(columnNumber[r][c] > heightOfBoard/2)
+			{
+				if(columnNumber[r][c] < 10) printf(" ");
+				ColorNumber(columnNumber[r][c], 0x02);
+			}
+			else if(columnNumber[r][c] > 9)
+			{
+				ColorNumber(columnNumber[r][c], 0x0e);
+			}
 			else
 			{
 				printf("%2d", columnNumber[r][c]);
@@ -86,6 +108,20 @@ void PrintBoard(int mode)
 			{
 				printf("  ");
 			}
+			else if(rowNumber[r][c] == widthOfBoard)
+			{
+				if(rowNumber[r][c] < 10) printf(" ");
+				ColorNumber(rowNumber[r][c], 0x01);
+			}
+			else if(rowNumber[r][c] > widthOfBoard/2)
+			{
+				if(rowNumber[r][c] < 10) printf(" ");
+				ColorNumber(rowNumber[r][c], 0x02);
+			}
+			else if(rowNumber[r][c] > 9)
+			{
+				ColorNumber(rowNumber[r][c], 0x0e);
+			}
 			else
 			{
 				printf("%2d", rowNumber[r][c]);
@@ -99,17 +135,14 @@ void PrintBoard(int mode)
 				{
 					if(isOpen[r][c] == 2)
 					{
-						//printf(" #");
 						ColorStr(" #", 0x06);
 					}
 					else if(isOpen[r][c] == 1)
 					{
-						//printf(" @");
 						ColorStr(" @", 0x04);
 					}
 					else
 					{
-						//printf(" *");
 						ColorStr(" *", 0x0c);
 					}
 				}
@@ -117,8 +150,7 @@ void PrintBoard(int mode)
 				{
 					if(isOpen[r][c] == 2)
 					{
-						//printf("_#");
-						ColorStr("_#", 0x04);
+						ColorStr(" _", 0x06);
 					}
 					else if(isOpen[r][c] == 1)
 					{
@@ -134,13 +166,12 @@ void PrintBoard(int mode)
 			{
 				if(isOpen[r][c] == 2)
 				{
-					//printf(" #");
 					ColorStr(" #", 0x06);
 				}
 				else if(isOpen[r][c] == 1)
 				{
-					/*if(isMine[r][c] == 1) ColorStr(" @", 0x04);
-					else */printf("  ");
+					if(isMine[r][c] == 1) ColorStr(" @", 0x04);
+					else printf("  ");
 				}
 				else
 				{
@@ -274,6 +305,7 @@ int main()
 		if(choiceMode == 1)
 		{
 			clrscr();
+			//isSigning = 0;
 			seed = time(0);
 			SummonBoard(seed);
 			SetConsoleMouseMode(1);
@@ -290,7 +322,7 @@ int main()
 					GetNumberOfConsoleInputEvents(hdin, &rcdnum);
 					if(rcdnum == 0)
 					{
-						Sleep(100);
+						Sleep(RefreshCycle);
 						continue;
 					}
 					ReadConsoleInput(hdin, &rcd, 1, &rcdnum);
@@ -326,7 +358,7 @@ int main()
 						mouseOperatedPos.X = 0;
 						mouseOperatedPos.Y = 0;
 					}
-					Sleep(100);
+					Sleep(RefreshCycle);
 				}
 				if(isMine[r][c] == 1 && isOpen[r][c] == 1)
 				{
@@ -337,7 +369,7 @@ int main()
 				{
 					for(c=0; c<widthOfBoard; c++)
 					{
-						if(isMine[r][c] == 0 && isOpen[r][c] == 0)
+						if(isMine[r][c] == 0 && isOpen[r][c] != 1)
 						{
 							isEnd = 0;//存在未翻开的非雷方块
 						}
@@ -401,7 +433,7 @@ int main()
 				if(heightOfBoard < 1) heightOfBoard = 1;
 				if(heightOfBoard > 20) heightOfBoard = 20;
 				if(widthOfBoard < 1) widthOfBoard = 1;
-				if(widthOfBoard > 15) widthOfBoard = 15;
+				if(widthOfBoard > 20) widthOfBoard = 20;
 				if(numberOfMine < 0) numberOfMine = 0;
 				if(numberOfMine > heightOfBoard * widthOfBoard) numberOfMine = heightOfBoard * widthOfBoard;
 			}
@@ -414,3 +446,14 @@ int main()
 	}
 	return 0;
 }
+
+/*--------------------------------
+更新日志：
+Nonogram 0.2
+——新增 大数字彩色显示
+——优化 刷新周期从100ms提高到50ms
+——优化 调整错误标记显示
+——优化 地图列数上限提升到20
+——修复 错误标记可能异常停止游戏
+//——新增 拖动标记根据起始操作统一标记/取消标记
+--------------------------------*/
