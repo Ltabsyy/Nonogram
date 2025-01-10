@@ -13,6 +13,7 @@ int columnNumber[10][20];
 int heightOfBoard = 6;
 int widthOfBoard = 6;
 int numberOfMine = 27;
+int summonCheckMode = 0;
 
 void ColorStr(const char* content, int color)//输出彩色字符
 {
@@ -74,27 +75,23 @@ void PrintBoard(int mode)
 		}
 		for(c=0; c<widthOfBoard; c++)
 		{
-			if(columnNumber[r][c] == 0)
-			{
-				printf("  ");
-			}
+			if(columnNumber[r][c] < 10) putchar(' ');
+			if(columnNumber[r][c] == 0) putchar(' ');
 			else if(columnNumber[r][c] == heightOfBoard)
 			{
-				if(columnNumber[r][c] < 10) printf(" ");
 				ColorNumber(columnNumber[r][c], 0x01);
 			}
 			else if(columnNumber[r][c] > heightOfBoard/2)
 			{
-				if(columnNumber[r][c] < 10) printf(" ");
 				ColorNumber(columnNumber[r][c], 0x02);
 			}
-			else if(columnNumber[r][c] > 9)
+			else if(columnNumber[r][c] > heightOfBoard/3)
 			{
-				ColorNumber(columnNumber[r][c], 0x0e);
+				ColorNumber(columnNumber[r][c], 0x04);
 			}
 			else
 			{
-				printf("%2d", columnNumber[r][c]);
+				printf("%d", columnNumber[r][c]);
 			}
 		}
 		printf("\n");
@@ -104,27 +101,23 @@ void PrintBoard(int mode)
 		// 行数字
 		for(c=0; c<(widthOfBoard+1)/2; c++)
 		{
-			if(rowNumber[r][c] == 0)
-			{
-				printf("  ");
-			}
+			if(rowNumber[r][c] < 10) putchar(' ');
+			if(rowNumber[r][c] == 0) putchar(' ');
 			else if(rowNumber[r][c] == widthOfBoard)
 			{
-				if(rowNumber[r][c] < 10) printf(" ");
 				ColorNumber(rowNumber[r][c], 0x01);
 			}
 			else if(rowNumber[r][c] > widthOfBoard/2)
 			{
-				if(rowNumber[r][c] < 10) printf(" ");
 				ColorNumber(rowNumber[r][c], 0x02);
 			}
-			else if(rowNumber[r][c] > 9)
+			else if(rowNumber[r][c] > widthOfBoard/3)
 			{
-				ColorNumber(rowNumber[r][c], 0x0e);
+				ColorNumber(rowNumber[r][c], 0x04);
 			}
 			else
 			{
-				printf("%2d", rowNumber[r][c]);
+				printf("%d", rowNumber[r][c]);
 			}
 		}
 		for(c=0; c<widthOfBoard; c++)
@@ -187,24 +180,116 @@ void SummonBoard(int seed)
 {
 	int r, c, i, n;
 	srand(seed);
-	// 初始化
-	for(r=0; r<heightOfBoard; r++)
+	while(1)
 	{
-		for(c=0; c<widthOfBoard; c++)
+		// 初始化
+		for(r=0; r<heightOfBoard; r++)
 		{
-			isMine[r][c] = 0;
-			isOpen[r][c] = 0;
+			for(c=0; c<widthOfBoard; c++)
+			{
+				isMine[r][c] = 0;
+				isOpen[r][c] = 0;
+			}
 		}
-	}
-	// 生成雷
-	for(i=0; i<numberOfMine; )
-	{
-		r = rand() % heightOfBoard;
-		c = rand() % widthOfBoard;
-		if(isMine[r][c] == 0)
+		// 生成雷
+		for(i=0; i<numberOfMine; )
 		{
-			isMine[r][c] = 1;
-			i++;
+			r = rand() % heightOfBoard;
+			c = rand() % widthOfBoard;
+			if(isMine[r][c] == 0)
+			{
+				isMine[r][c] = 1;
+				i++;
+			}
+		}
+		if(summonCheckMode == 0) break;
+		else if(summonCheckMode == 1)
+		{
+			// 校验存在顶满边则退出，即存在一边的雷场不存在连续2空
+			if(isMine[0][0] != 0 && isMine[heightOfBoard-1][0] != 0)
+			{
+				n = 0;
+				for(r=0; r<heightOfBoard-1; r++)
+				{
+					if(isMine[r][0] == 0 && isMine[r+1][0] == 0)
+					{
+						n = 1;
+						break;
+					}
+				}
+				if(n == 0) break;
+			}
+			if(isMine[0][widthOfBoard-1] != 0 && isMine[heightOfBoard-1][widthOfBoard-1] != 0)
+			{
+				n = 0;
+				for(r=0; r<heightOfBoard-1; r++)
+				{
+					if(isMine[r][widthOfBoard-1] == 0 && isMine[r+1][widthOfBoard-1] == 0)
+					{
+						n = 1;
+						break;
+					}
+				}
+				if(n == 0) break;
+			}
+			if(isMine[0][0] != 0 && isMine[0][widthOfBoard-1] != 0)
+			{
+				n = 0;
+				for(c=0; c<widthOfBoard-1; c++)
+				{
+					if(isMine[0][c] == 0 && isMine[0][c+1] == 0)
+					{
+						n = 1;
+						break;
+					}
+				}
+				if(n == 0) break;
+			}
+			if(isMine[heightOfBoard-1][0] != 0 && isMine[heightOfBoard-1][widthOfBoard-1] != 0)
+			{
+				n = 0;
+				for(c=0; c<widthOfBoard-1; c++)
+				{
+					if(isMine[heightOfBoard-1][c] == 0 && isMine[heightOfBoard-1][c+1] == 0)
+					{
+						n = 1;
+						break;
+					}
+				}
+				if(n == 0) break;
+			}
+		}
+		else if(summonCheckMode == 2)
+		{
+			//校验存在空线则退出
+			for(r=0; r<heightOfBoard; r++)
+			{
+				n = 0;
+				for(c=0; c<widthOfBoard; c++)
+				{
+					if(isMine[r][c] == 1)
+					{
+						n = 1;
+						break;
+					}
+				}
+				if(n == 0) break;
+			}
+			if(n == 0) break;
+			for(c=0; c<widthOfBoard; c++)
+			{
+				n = 0;
+				for(r=0; r<heightOfBoard; r++)
+				{
+					if(isMine[r][c] == 1)
+					{
+						n = 1;
+						break;
+					}
+				}
+				if(n == 0) break;
+			}
+			if(n == 0) break;
 		}
 	}
 	// 初始化数字
@@ -280,11 +365,28 @@ void SummonBoard(int seed)
 	}
 }
 
+int CheckSign()
+{
+	int r, c;
+	for(r=0; r<heightOfBoard; r++)
+	{
+		for(c=0; c<widthOfBoard; c++)
+		{
+			if((isMine[r][c] == 0 && isOpen[r][c] == 2)//错误标记
+				|| (isMine[r][c] == 1 && isOpen[r][c] == 0))//未标记的雷
+			{
+				return 0;
+			}
+		}
+	}
+	return 1;//胜利
+}
+
 int main()
 {
 	int choiceMode;
 	int seed, r, c, isSigning;
-	int isEnd, temp;
+	int isEnd, temp, remainder;
 	HANDLE hdin = GetStdHandle(STD_INPUT_HANDLE);
 	COORD mousePos = {0, 0};
 	COORD mouseOperatedPos = {0, 0};//鼠标已操作坐标，屏蔽双击
@@ -307,6 +409,7 @@ int main()
 			clrscr();
 			//isSigning = 0;
 			seed = time(0);
+			remainder = numberOfMine;
 			SummonBoard(seed);
 			SetConsoleMouseMode(1);
 			showCursor(0);
@@ -315,13 +418,15 @@ int main()
 				gotoxy(0, 0);
 				PrintBoard(0);
 				//getchar();
+				isEnd = 0;
 				while(1)
 				{
 					gotoxy(0, (heightOfBoard+1)/2+heightOfBoard);
-					printf("用时：%d\n", time(0)-seed);
+					printf("剩余雷数：%d 用时：%d \n", remainder, time(0)-seed);
 					GetNumberOfConsoleInputEvents(hdin, &rcdnum);
 					if(rcdnum == 0)
 					{
+						showCursor(0);
 						Sleep(RefreshCycle);
 						continue;
 					}
@@ -345,11 +450,30 @@ int main()
 								if(mousePos.X >= mouseOperatedPos.X-1 && mousePos.X <= mouseOperatedPos.X+1 && mousePos.Y == mouseOperatedPos.Y);
 								else
 								{
-									if(isOpen[r][c] == 0) isOpen[r][c] = 2;
-									else if(isOpen[r][c] == 2) isOpen[r][c] = 0;
+									if(isOpen[r][c] == 0)
+									{
+										isOpen[r][c] = 2;
+										remainder--;
+									}
+									else if(isOpen[r][c] == 2)
+									{
+										isOpen[r][c] = 0;
+										remainder++;
+									}
 									mouseOperatedPos = mousePos;
 									break;
 								}
+							}
+						}
+					}
+					else if(rcd.EventType == KEY_EVENT && rcd.Event.KeyEvent.bKeyDown == 1)
+					{
+						if(rcd.Event.KeyEvent.wVirtualKeyCode == ' ')
+						{
+							if(CheckSign() == 1)
+							{
+								isEnd = 1;
+								break;
 							}
 						}
 					}
@@ -358,12 +482,14 @@ int main()
 						mouseOperatedPos.X = 0;
 						mouseOperatedPos.Y = 0;
 					}
+					showCursor(0);
 					Sleep(RefreshCycle);
 				}
 				if(isMine[r][c] == 1 && isOpen[r][c] == 1)
 				{
 					break;//翻开雷失败
 				}
+				if(isEnd == 1) break;//标记校验成功
 				isEnd = 1;//翻开所有非雷方块成功
 				for(r=0; r<heightOfBoard; r++)
 				{
@@ -392,10 +518,11 @@ int main()
 			printf("*******************************\n");//宽31
 			printf("(1)初级： 6*6  - 27\n");
 			printf("(2)中级：10*10 - 64\n");
-			printf("(3)高级：15*12 - 90\n");
-			printf("(4)专家：20*15 -148\n");
+			printf("(3)高级：12*15 - 90\n");
+			printf("(4)专家：15*20 -148\n");
 			printf("(5)自定义\n");
 			printf("*******************************\n");
+			printf("当前难度:%d*%d-%d|密度:%.2f\n", heightOfBoard, widthOfBoard, numberOfMine, (float)numberOfMine/heightOfBoard/widthOfBoard);
 			printf(">");
 			scanf("%d", &temp);
 			if(temp == 1)
@@ -412,14 +539,14 @@ int main()
 			}
 			else if(temp == 3)
 			{
-				heightOfBoard = 15;
-				widthOfBoard = 12;
+				heightOfBoard = 12;
+				widthOfBoard = 15;
 				numberOfMine = 90;
 			}
 			else if(temp == 4)
 			{
-				heightOfBoard = 20;
-				widthOfBoard = 15;
+				heightOfBoard = 15;
+				widthOfBoard = 20;
 				numberOfMine = 148;
 			}
 			else if(temp == 5)
@@ -436,8 +563,14 @@ int main()
 				if(widthOfBoard > 20) widthOfBoard = 20;
 				if(numberOfMine < 0) numberOfMine = 0;
 				if(numberOfMine > heightOfBoard * widthOfBoard) numberOfMine = heightOfBoard * widthOfBoard;
+				while(numberOfMine < (heightOfBoard+1)/2 || numberOfMine < (widthOfBoard+1)/2) numberOfMine++;
 			}
 			clrscr();
+		}
+		else if(choiceMode == 4)
+		{
+			printf("[地图生成校验：0关闭/1必存在顶满边/2必存在空线]>");
+			scanf("%d", &summonCheckMode);
 		}
 		else// if(choiceMode == 3)
 		{
@@ -455,5 +588,13 @@ Nonogram 0.2
 ——优化 调整错误标记显示
 ——优化 地图列数上限提升到20
 ——修复 错误标记可能异常停止游戏
+Nonogram 0.3
+——新增 设置内显示当前难度
+——新增 游戏时按空格执行标记校验
+——新增 显示剩余雷数
+——新增 可按4设置地图生成校验必存在顶满边或必存在空线
+——优化 高级和专家难度改为横向
+——优化 数字配色
+——修复 游戏时调整窗口大小显示控制台光标
 //——新增 拖动标记根据起始操作统一标记/取消标记
 --------------------------------*/
