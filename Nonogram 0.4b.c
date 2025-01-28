@@ -3,17 +3,33 @@
 #include <time.h>
 #include <windows.h>
 
+#define LimHeight 24
+#define LimWidth 24
 #define RefreshCycle 50
 
-int isMine[20][20];
-int isOpen[20][20];
-int rowNumber[20][10];
-int columnNumber[10][20];
+int isMine[LimHeight][LimWidth];
+int isOpen[LimHeight][LimWidth];
+//int solution[LimHeight][LimWidth];
+int rowNumber[LimHeight][(LimWidth+1)/2];
+int columnNumber[(LimHeight+1)/2][LimWidth];
+int rowNumberColor[LimHeight][(LimWidth+1)/2];
+int columnNumberColor[(LimHeight+1)/2][LimWidth];
+
+// 标准线
+/*int* lineMine = 0;
+int* lineOpen = 0;
+int* lineSolution = 0;
+int* lineNumber = 0;
+int lengthOfLine;
+int countOfLineNumber;*/
 
 int heightOfBoard = 6;
 int widthOfBoard = 6;
 int numberOfMine = 27;
 int summonCheckMode = 0;
+
+int lengthOfRowNumber = 3;
+int lengthOfColumnNumber = 3;
 
 void ColorStr(const char* content, int color)//输出彩色字符
 {
@@ -77,22 +93,7 @@ void PrintBoard(int mode)
 		{
 			if(columnNumber[r][c] < 10) putchar(' ');
 			if(columnNumber[r][c] == 0) putchar(' ');
-			else if(columnNumber[r][c] == heightOfBoard)
-			{
-				ColorNumber(columnNumber[r][c], 0x01);
-			}
-			else if(columnNumber[r][c] > heightOfBoard/2)
-			{
-				ColorNumber(columnNumber[r][c], 0x02);
-			}
-			else if(columnNumber[r][c] > heightOfBoard/3)
-			{
-				ColorNumber(columnNumber[r][c], 0x04);
-			}
-			else
-			{
-				printf("%d", columnNumber[r][c]);
-			}
+			else ColorNumber(columnNumber[r][c], columnNumberColor[r][c]);
 		}
 		printf("\n");
 	}
@@ -103,22 +104,7 @@ void PrintBoard(int mode)
 		{
 			if(rowNumber[r][c] < 10) putchar(' ');
 			if(rowNumber[r][c] == 0) putchar(' ');
-			else if(rowNumber[r][c] == widthOfBoard)
-			{
-				ColorNumber(rowNumber[r][c], 0x01);
-			}
-			else if(rowNumber[r][c] > widthOfBoard/2)
-			{
-				ColorNumber(rowNumber[r][c], 0x02);
-			}
-			else if(rowNumber[r][c] > widthOfBoard/3)
-			{
-				ColorNumber(rowNumber[r][c], 0x04);
-			}
-			else
-			{
-				printf("%d", rowNumber[r][c]);
-			}
+			else ColorNumber(rowNumber[r][c], rowNumberColor[r][c]);
 		}
 		for(c=0; c<widthOfBoard; c++)
 		{
@@ -151,7 +137,9 @@ void PrintBoard(int mode)
 					}
 					else
 					{
-						printf(" %%");
+						//printf(" %%");
+						if(r%3 == 0 || c%3 == 0) ColorStr(" %", 0x08);
+						else printf(" %%");
 					}
 				}
 			}
@@ -168,7 +156,9 @@ void PrintBoard(int mode)
 				}
 				else
 				{
-					printf(" %%");
+					//printf(" %%");
+					if(r%3 == 0 || c%3 == 0) ColorStr(" %", 0x08);
+					else printf(" %%");
 				}
 			}
 		}
@@ -295,12 +285,12 @@ void SummonBoard(int seed)
 	// 初始化数字
 	for(r=0; r<heightOfBoard; r++)
 	{
-		for(c=0; c<(widthOfBoard+1)/2; c++)
+		for(c=0; c<lengthOfRowNumber; c++)
 		{
 			rowNumber[r][c] = 0;
 		}
 	}
-	for(r=0; r<(heightOfBoard+1)/2; r++)
+	for(r=0; r<lengthOfColumnNumber; r++)
 	{
 		for(c=0; c<widthOfBoard; c++)
 		{
@@ -311,7 +301,7 @@ void SummonBoard(int seed)
 	for(r=0; r<heightOfBoard; r++)
 	{
 		n = 0;
-		i = (widthOfBoard+1)/2-1;
+		i = lengthOfRowNumber-1;
 		for(c=widthOfBoard-1; c>=0; c--)
 		{
 			if(isMine[r][c] == 0)
@@ -339,7 +329,7 @@ void SummonBoard(int seed)
 	for(c=0; c<widthOfBoard; c++)
 	{
 		n = 0;
-		i = (heightOfBoard+1)/2-1;
+		i = lengthOfColumnNumber-1;
 		for(r=heightOfBoard-1; r>=0; r--)
 		{
 			if(isMine[r][c] == 0)
@@ -363,6 +353,51 @@ void SummonBoard(int seed)
 			i--;
 		}
 	}
+	// 初始化颜色
+	for(r=0; r<heightOfBoard; r++)
+	{
+		for(c=0; c<lengthOfRowNumber; c++)
+		{
+			rowNumberColor[r][c] = 0x07;
+			if(rowNumber[r][c] != 0)
+			{
+				if(rowNumber[r][c] == widthOfBoard)
+				{
+					rowNumberColor[r][c] = 0x01;
+				}
+				else if(rowNumber[r][c] > widthOfBoard/2)
+				{
+					rowNumberColor[r][c] = 0x02;
+				}
+				else if(rowNumber[r][c] > widthOfBoard/3)
+				{
+					rowNumberColor[r][c] = 0x04;
+				}
+			}
+		}
+	}
+	for(r=0; r<lengthOfColumnNumber; r++)
+	{
+		for(c=0; c<widthOfBoard; c++)
+		{
+			columnNumberColor[r][c] = 0x07;
+			if(columnNumber[r][c] != 0)
+			{
+				if(columnNumber[r][c] == heightOfBoard)
+				{
+					columnNumberColor[r][c] = 0x01;
+				}
+				else if(columnNumber[r][c] > heightOfBoard/2)
+				{
+					columnNumberColor[r][c] = 0x02;
+				}
+				else if(columnNumber[r][c] > heightOfBoard/3)
+				{
+					columnNumberColor[r][c] = 0x04;
+				}
+			}
+		}
+	}
 }
 
 int CheckSign()
@@ -381,7 +416,108 @@ int CheckSign()
 	}
 	return 1;//胜利
 }
+/*
+void RecoverLine(int r, int c, int mode)//0生成line，1写出
+{
+	int i, i0;
+	if(r != -1 && c == -1)//行操作，r有效
+	{
+		if(mode == 0)
+		{
+			lengthOfLine = widthOfBoard;
+			if(lineMine != 0) lineMine =(int*) calloc(lengthOfLine, sizeof(int));
+			if(lineOpen != 0) lineOpen =(int*) calloc(lengthOfLine, sizeof(int));
+			if(lineSolution != 0) lineSolution =(int*) calloc(lengthOfLine, sizeof(int));
+			for(i=0; i<lengthOfLine; i++)
+			{
+				lineMine[i] = isMine[r][i];
+				lineOpen[i] = isOpen[r][i];
+				lineSolution[i] = solution[r][i];
+			}
+			countOfLineNumber = (lengthOfLine+1)/2;
+			for(i=0; i<countOfLineNumber; i++)
+			{
+				if(rowNumber[r][i] == 0) countOfLineNumber--;
+				else break;
+			}
+			if(lineNumber != 0) lineNumber =(int*) calloc(countOfLineNumber, sizeof(int));
+			for(i0=i; i<countOfLineNumber; i++)
+			{
+				lineNumber[i-i0] = rowNumber[r][i];
+			}
+		}
+	}
+	else if(r == -1 && c != -1)//列操作，c有效
+	{
+		if(mode == 0)
+		{
+			lengthOfLine = heightOfBoard;
+			if(lineMine != 0) lineMine =(int*) calloc(lengthOfLine, sizeof(int));
+			if(lineOpen != 0) lineOpen =(int*) calloc(lengthOfLine, sizeof(int));
+			if(lineSolution != 0) lineSolution =(int*) calloc(lengthOfLine, sizeof(int));
+			for(i=0; i<lengthOfLine; i++)
+			{
+				lineMine[i] = isMine[i][c];
+				lineOpen[i] = isOpen[i][c];
+				lineSolution[i] = solution[i][c];
+			}
+			countOfLineNumber = (lengthOfLine+1)/2;
+			for(i=0; i<countOfLineNumber; i++)
+			{
+				if(columnNumber[i][c] == 0) countOfLineNumber--;
+				else break;
+			}
+			if(lineNumber != 0) lineNumber =(int*) calloc(countOfLineNumber, sizeof(int));
+			for(i0=i; i<countOfLineNumber; i++)
+			{
+				lineNumber[i-i0] = columnNumber[i][c];
+			}
+		}
+	}
+}
 
+struct LinesIterator//标准线组迭代器
+{
+	int r, c;
+};
+
+struct LinesIterator LinesIteratorBegin()
+{
+	struct LinesIterator li;
+	li.r = 0;
+	li.c = -1;
+	return li;
+}
+
+struct LinesIterator LinesIteratorEnd()//超尾
+{
+	struct LinesIterator li;
+	li.r = -1;
+	li.c = -1;
+	return li;
+}
+
+void LinesIteratorNext(struct LinesIterator* li)
+{
+	if(li->r != -1 && li->c == -1)
+	{
+		li->r++;
+		if(li->r == heightOfBoard)
+		{
+			li->r = -1;
+			li->c = 0;
+		}
+	}
+	else if(li->r == -1 && li->c != -1)
+	{
+		li->c++;
+		if(li->c == widthOfBoard)
+		{
+			li->c = -1;
+		}
+	}
+}
+*/
 int main()
 {
 	int choiceMode;
@@ -412,6 +548,7 @@ int main()
 			remainder = numberOfMine;
 			SummonBoard(seed);
 			SetConsoleMouseMode(1);
+			//FlushConsoleInputBuffer(hdin);
 			showCursor(0);
 			while(1)
 			{
@@ -435,8 +572,8 @@ int main()
 					if(rcd.EventType == MOUSE_EVENT)
 					{
 						mousePos = rcd.Event.MouseEvent.dwMousePosition;
-						r = mousePos.Y - (heightOfBoard+1)/2;
-						c = (mousePos.X-1)/2 - (widthOfBoard+1)/2;
+						r = mousePos.Y - lengthOfColumnNumber;
+						c = (mousePos.X-1)/2 - lengthOfRowNumber;
 						if(r>=0 && r<heightOfBoard && c>=0 && c<widthOfBoard)
 						{
 							if(rcd.Event.MouseEvent.dwButtonState == FROM_LEFT_1ST_BUTTON_PRESSED)
@@ -463,6 +600,62 @@ int main()
 									mouseOperatedPos = mousePos;
 									break;
 								}
+							}
+						}
+						else if(r>=0 && r<heightOfBoard && c < 0)//行数字
+						{
+							if(rcd.Event.MouseEvent.dwButtonState == FROM_LEFT_1ST_BUTTON_PRESSED
+								|| rcd.Event.MouseEvent.dwButtonState == RIGHTMOST_BUTTON_PRESSED)
+							{
+								if(rowNumberColor[r][c+lengthOfRowNumber] != 0x08)
+								{
+									rowNumberColor[r][c+lengthOfRowNumber] = 0x08;
+								}
+								else if(rowNumber[r][c+lengthOfRowNumber] == widthOfBoard)
+								{
+									rowNumberColor[r][c+lengthOfRowNumber] = 0x01;
+								}
+								else if(rowNumber[r][c+lengthOfRowNumber] > widthOfBoard/2)
+								{
+									rowNumberColor[r][c+lengthOfRowNumber] = 0x02;
+								}
+								else if(rowNumber[r][c+lengthOfRowNumber] > widthOfBoard/3)
+								{
+									rowNumberColor[r][c+lengthOfRowNumber] = 0x04;
+								}
+								else
+								{
+									rowNumberColor[r][c+lengthOfRowNumber] = 0x07;
+								}
+								break;
+							}
+						}
+						else if(r < 0 && c>=0 && c<widthOfBoard)//列数字
+						{
+							if(rcd.Event.MouseEvent.dwButtonState == FROM_LEFT_1ST_BUTTON_PRESSED
+								|| rcd.Event.MouseEvent.dwButtonState == RIGHTMOST_BUTTON_PRESSED)
+							{
+								if(columnNumberColor[r+lengthOfColumnNumber][c] != 0x08)
+								{
+									columnNumberColor[r+lengthOfColumnNumber][c] = 0x08;
+								}
+								else if(columnNumber[r+lengthOfColumnNumber][c] == heightOfBoard)
+								{
+									columnNumberColor[r+lengthOfColumnNumber][c] = 0x01;
+								}
+								else if(columnNumber[r+lengthOfColumnNumber][c] > heightOfBoard/2)
+								{
+									columnNumberColor[r+lengthOfColumnNumber][c] = 0x02;
+								}
+								else if(columnNumber[r+lengthOfColumnNumber][c] > heightOfBoard/3)
+								{
+									columnNumberColor[r+lengthOfColumnNumber][c] = 0x04;
+								}
+								else
+								{
+									columnNumberColor[r+lengthOfColumnNumber][c] = 0x07;
+								}
+								break;
 							}
 						}
 					}
@@ -558,13 +751,15 @@ int main()
 				printf("[雷数]>");
 				scanf("%d", &numberOfMine);
 				if(heightOfBoard < 1) heightOfBoard = 1;
-				if(heightOfBoard > 20) heightOfBoard = 20;
+				if(heightOfBoard > LimHeight) heightOfBoard = LimHeight;
 				if(widthOfBoard < 1) widthOfBoard = 1;
-				if(widthOfBoard > 20) widthOfBoard = 20;
+				if(widthOfBoard > LimWidth) widthOfBoard = LimWidth;
 				if(numberOfMine < 0) numberOfMine = 0;
 				if(numberOfMine > heightOfBoard * widthOfBoard) numberOfMine = heightOfBoard * widthOfBoard;
 				while(numberOfMine < (heightOfBoard+1)/2 || numberOfMine < (widthOfBoard+1)/2) numberOfMine++;
 			}
+			lengthOfRowNumber = (widthOfBoard+1)/2;
+			lengthOfColumnNumber = (heightOfBoard+1)/2;
 			clrscr();
 		}
 		else if(choiceMode == 4)
@@ -596,5 +791,12 @@ Nonogram 0.3
 ——优化 高级和专家难度改为横向
 ——优化 数字配色
 ——修复 游戏时调整窗口大小显示控制台光标
+Nonogram 0.4
+——新增 鼠标点击数字时切换数字暗淡/明亮
+——新增 地图辅助线
+——优化 统一计算数字长度
+——优化 颜色仅在地图生成时计算
+——优化 地图大小上限从20*20提升到24*24
 //——新增 拖动标记根据起始操作统一标记/取消标记
+//——修复 再次进入游戏时可能持续翻开方块
 --------------------------------*/
