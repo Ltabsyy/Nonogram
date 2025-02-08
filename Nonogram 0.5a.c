@@ -33,6 +33,24 @@ int lengthOfColumnNumber = 3;
 
 int debug = 0;
 
+void PrintBoard(int mode);
+void SummonBoard(int seed);
+int CheckSign();
+void RecoverLine(int r, int c, int mode);
+struct LinesIterator//标准线组迭代器
+{
+	int r, c;
+};
+struct LinesIterator LinesIteratorBegin();
+int IsLinesIteratorEnd(struct LinesIterator li);
+void LinesIteratorNext(struct LinesIterator* li);
+int PutNumber(int* mine, int pos, int number);
+int* LineFirstSolutionMine();
+int* LineLastSolutionMine();
+int SolveLine(struct LinesIterator li);
+int SolveStep();
+int Solve();
+
 void ColorStr(const char* content, int color)//输出彩色字符
 {
 	SetConsoleTextAttribute(GetStdHandle(STD_OUTPUT_HANDLE), color);
@@ -81,15 +99,13 @@ void SetConsoleMouseMode(int mode)//键鼠操作切换
 	}
 }
 
-int Solve();
-
 void PrintBoard(int mode)
 {
 	int r, c;
 	// 列数字
-	for(r=0; r<(heightOfBoard+1)/2; r++)
+	for(r=0; r<lengthOfColumnNumber; r++)
 	{
-		for(c=0; c<(widthOfBoard+1)/2; c++)
+		for(c=0; c<lengthOfRowNumber; c++)
 		{
 			printf("  ");
 		}
@@ -104,7 +120,7 @@ void PrintBoard(int mode)
 	for(r=0; r<heightOfBoard; r++)
 	{
 		// 行数字
-		for(c=0; c<(widthOfBoard+1)/2; c++)
+		for(c=0; c<lengthOfRowNumber; c++)
 		{
 			if(rowNumber[r][c] < 10) putchar(' ');
 			if(rowNumber[r][c] == 0) putchar(' ');
@@ -514,11 +530,6 @@ void RecoverLine(int r, int c, int mode)//0生成line，1写出
 	}
 }
 
-struct LinesIterator//标准线组迭代器
-{
-	int r, c;
-};
-
 struct LinesIterator LinesIteratorBegin()
 {
 	struct LinesIterator li;
@@ -702,7 +713,6 @@ int SolveLine(struct LinesIterator li)
 	//首末解交汇分析
 	int* firstMine = LineFirstSolutionMine();//生成首解雷场
 	int* lastMine = LineLastSolutionMine();//生成末解雷场
-	int* hasfirstSolution =(int*) calloc(countOfLineNumber, sizeof(int));//数字首解存在栈，用于回溯定位
 	int matchFirstLast = 1;
 	for(i=0; i<lengthOfLine; i++)
 	{
@@ -814,7 +824,6 @@ int SolveLine(struct LinesIterator li)
 	RecoverLine(li.r, li.c, 1);
 	free(firstMine);
 	free(lastMine);
-	free(hasfirstSolution);
 	//返回是否存在解
 	for(i=0; i<lengthOfLine; i++)
 	{
@@ -1147,6 +1156,7 @@ Nonogram 0.4
 ——优化 统一计算数字长度
 ——优化 颜色仅在地图生成时计算
 ——优化 地图大小上限从20*20提升到24*24
+Nonogram 0.5
 //——新增 拖动标记根据起始操作统一标记/取消标记
 //——修复 再次进入游戏时可能持续翻开方块
 --------------------------------*/
