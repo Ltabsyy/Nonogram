@@ -99,6 +99,270 @@ void SetConsoleMouseMode(int mode)//键鼠操作切换
 	}
 }
 
+int main()
+{
+	int choiceMode;
+	int seed, r, c, isSigning;
+	int isEnd, temp, remainder;
+	HANDLE hdin = GetStdHandle(STD_INPUT_HANDLE);
+	COORD mousePos = {0, 0};
+	COORD mouseOperatedPos = {0, 0};//鼠标已操作坐标，屏蔽双击
+	INPUT_RECORD rcd;
+	DWORD rcdnum;
+	int isReadyRefreshMouseOperatedPos = 0;
+	while(1)
+	{
+		//clrscr();
+		printf("*******************************\n"//宽31
+			   "(1)新游戏\n"
+			   "(2)设置\n"
+			   "(3)退出\n"
+			   "*******************************\n");
+		printf(">");
+		choiceMode = 0;
+		scanf("%d", &choiceMode);
+		if(choiceMode == 1)
+		{
+			clrscr();
+			//isSigning = 0;
+			seed = time(0);
+			//seed = 7;
+			remainder = numberOfMine;
+			SummonBoard(seed);
+			SetConsoleMouseMode(1);
+			//FlushConsoleInputBuffer(hdin);
+			showCursor(0);
+			while(1)
+			{
+				gotoxy(0, 0);
+				PrintBoard(0);
+				//getchar();
+				isEnd = 0;
+				while(1)
+				{
+					gotoxy(0, (heightOfBoard+1)/2+heightOfBoard);
+					printf("剩余雷数：%d 用时：%d \n", remainder, time(0)-seed);
+					GetNumberOfConsoleInputEvents(hdin, &rcdnum);
+					if(rcdnum == 0)
+					{
+						showCursor(0);
+						Sleep(RefreshCycle);
+						continue;
+					}
+					ReadConsoleInput(hdin, &rcd, 1, &rcdnum);
+					isReadyRefreshMouseOperatedPos = 1;
+					if(rcd.EventType == MOUSE_EVENT)
+					{
+						mousePos = rcd.Event.MouseEvent.dwMousePosition;
+						r = mousePos.Y - lengthOfColumnNumber;
+						c = (mousePos.X-1)/2 - lengthOfRowNumber;
+						if(r>=0 && r<heightOfBoard && c>=0 && c<widthOfBoard)
+						{
+							if(rcd.Event.MouseEvent.dwButtonState == FROM_LEFT_1ST_BUTTON_PRESSED)
+							{
+								if(isOpen[r][c] == 0) isOpen[r][c] = 1;
+								break;
+							}
+							else if(rcd.Event.MouseEvent.dwButtonState == RIGHTMOST_BUTTON_PRESSED)
+							{
+								isReadyRefreshMouseOperatedPos = 0;
+								if(mousePos.X >= mouseOperatedPos.X-1 && mousePos.X <= mouseOperatedPos.X+1 && mousePos.Y == mouseOperatedPos.Y);
+								else
+								{
+									if(isOpen[r][c] == 0)
+									{
+										isOpen[r][c] = 2;
+										remainder--;
+									}
+									else if(isOpen[r][c] == 2)
+									{
+										isOpen[r][c] = 0;
+										remainder++;
+									}
+									mouseOperatedPos = mousePos;
+									break;
+								}
+							}
+						}
+						else if(r>=0 && r<heightOfBoard && c < 0)//行数字
+						{
+							if(rcd.Event.MouseEvent.dwButtonState == FROM_LEFT_1ST_BUTTON_PRESSED
+								|| rcd.Event.MouseEvent.dwButtonState == RIGHTMOST_BUTTON_PRESSED)
+							{
+								if(rowNumberColor[r][c+lengthOfRowNumber] != 0x08)
+								{
+									rowNumberColor[r][c+lengthOfRowNumber] = 0x08;
+								}
+								else if(rowNumber[r][c+lengthOfRowNumber] == widthOfBoard)
+								{
+									rowNumberColor[r][c+lengthOfRowNumber] = 0x01;
+								}
+								else if(rowNumber[r][c+lengthOfRowNumber] > widthOfBoard/2)
+								{
+									rowNumberColor[r][c+lengthOfRowNumber] = 0x02;
+								}
+								else if(rowNumber[r][c+lengthOfRowNumber] > widthOfBoard/3)
+								{
+									rowNumberColor[r][c+lengthOfRowNumber] = 0x04;
+								}
+								else
+								{
+									rowNumberColor[r][c+lengthOfRowNumber] = 0x07;
+								}
+								break;
+							}
+						}
+						else if(r < 0 && c>=0 && c<widthOfBoard)//列数字
+						{
+							if(rcd.Event.MouseEvent.dwButtonState == FROM_LEFT_1ST_BUTTON_PRESSED
+								|| rcd.Event.MouseEvent.dwButtonState == RIGHTMOST_BUTTON_PRESSED)
+							{
+								if(columnNumberColor[r+lengthOfColumnNumber][c] != 0x08)
+								{
+									columnNumberColor[r+lengthOfColumnNumber][c] = 0x08;
+								}
+								else if(columnNumber[r+lengthOfColumnNumber][c] == heightOfBoard)
+								{
+									columnNumberColor[r+lengthOfColumnNumber][c] = 0x01;
+								}
+								else if(columnNumber[r+lengthOfColumnNumber][c] > heightOfBoard/2)
+								{
+									columnNumberColor[r+lengthOfColumnNumber][c] = 0x02;
+								}
+								else if(columnNumber[r+lengthOfColumnNumber][c] > heightOfBoard/3)
+								{
+									columnNumberColor[r+lengthOfColumnNumber][c] = 0x04;
+								}
+								else
+								{
+									columnNumberColor[r+lengthOfColumnNumber][c] = 0x07;
+								}
+								break;
+							}
+						}
+					}
+					else if(rcd.EventType == KEY_EVENT && rcd.Event.KeyEvent.bKeyDown == 1)
+					{
+						if(rcd.Event.KeyEvent.wVirtualKeyCode == ' ')
+						{
+							if(CheckSign() == 1)
+							{
+								isEnd = 1;
+								break;
+							}
+						}
+						else if(rcd.Event.KeyEvent.wVirtualKeyCode == '\t')
+						{
+							SolveStep();
+							break;
+						}
+					}
+					if(isReadyRefreshMouseOperatedPos == 1)
+					{
+						mouseOperatedPos.X = 0;
+						mouseOperatedPos.Y = 0;
+					}
+					showCursor(0);
+					Sleep(RefreshCycle);
+				}
+				if(r>=0 && r<heightOfBoard && c>=0 && c<widthOfBoard
+					&& isMine[r][c] == 1 && isOpen[r][c] == 1)
+				{
+					break;//翻开雷失败
+				}
+				if(isEnd == 1) break;//标记校验成功
+				isEnd = 1;//翻开所有非雷方块成功
+				for(r=0; r<heightOfBoard; r++)
+				{
+					for(c=0; c<widthOfBoard; c++)
+					{
+						if(isMine[r][c] == 0 && isOpen[r][c] != 1)
+						{
+							isEnd = 0;//存在未翻开的非雷方块
+						}
+					}
+				}
+				if(isEnd == 1) break;
+			}
+			clrscr();
+			gotoxy(0, 0);
+			PrintBoard(1);
+			if(isEnd == 1) printf(":)\nYou Win!\n");
+			else printf(":(\nGame Over!\n");
+			printf("用时：%d\n", time(0)-seed);
+			SetConsoleMouseMode(0);
+			showCursor(1);
+			fflush(stdin);
+		}
+		else if(choiceMode == 2)
+		{
+			printf("*******************************\n");//宽31
+			printf("(1)初级： 6*6  - 27\n");
+			printf("(2)中级：10*10 - 64\n");
+			printf("(3)高级：12*15 - 90\n");
+			printf("(4)专家：15*20 -148\n");
+			printf("(5)自定义\n");
+			printf("*******************************\n");
+			printf("当前难度:%d*%d-%d|密度:%.2f\n", heightOfBoard, widthOfBoard, numberOfMine, (float)numberOfMine/heightOfBoard/widthOfBoard);
+			printf(">");
+			scanf("%d", &temp);
+			if(temp == 1)
+			{
+				heightOfBoard = 6;
+				widthOfBoard = 6;
+				numberOfMine = 27;
+			}
+			else if(temp == 2)
+			{
+				heightOfBoard = 10;
+				widthOfBoard = 10;
+				numberOfMine = 64;
+			}
+			else if(temp == 3)
+			{
+				heightOfBoard = 12;
+				widthOfBoard = 15;
+				numberOfMine = 90;
+			}
+			else if(temp == 4)
+			{
+				heightOfBoard = 15;
+				widthOfBoard = 20;
+				numberOfMine = 148;
+			}
+			else if(temp == 5)
+			{
+				printf("[行数]>");
+				scanf("%d", &heightOfBoard);
+				printf("[列数]>");
+				scanf("%d", &widthOfBoard);
+				printf("[雷数]>");
+				scanf("%d", &numberOfMine);
+				if(heightOfBoard < 1) heightOfBoard = 1;
+				if(heightOfBoard > LimHeight) heightOfBoard = LimHeight;
+				if(widthOfBoard < 1) widthOfBoard = 1;
+				if(widthOfBoard > LimWidth) widthOfBoard = LimWidth;
+				if(numberOfMine < 0) numberOfMine = 0;
+				if(numberOfMine > heightOfBoard * widthOfBoard) numberOfMine = heightOfBoard * widthOfBoard;
+				while(numberOfMine < (heightOfBoard+1)/2 || numberOfMine < (widthOfBoard+1)/2) numberOfMine++;
+			}
+			lengthOfRowNumber = (widthOfBoard+1)/2;
+			lengthOfColumnNumber = (heightOfBoard+1)/2;
+			clrscr();
+		}
+		else if(choiceMode == 4)
+		{
+			printf("[地图生成校验：0关闭/1必存在顶满边/2必存在空线/3地图可解]>");
+			scanf("%d", &summonCheckMode);
+		}
+		else// if(choiceMode == 3)
+		{
+			break;
+		}
+	}
+	return 0;
+}
+
 void PrintBoard(int mode)
 {
 	int r, c;
@@ -866,270 +1130,6 @@ int Solve()
 		}
 	}
 	return 1;
-}
-
-int main()
-{
-	int choiceMode;
-	int seed, r, c, isSigning;
-	int isEnd, temp, remainder;
-	HANDLE hdin = GetStdHandle(STD_INPUT_HANDLE);
-	COORD mousePos = {0, 0};
-	COORD mouseOperatedPos = {0, 0};//鼠标已操作坐标，屏蔽双击
-	INPUT_RECORD rcd;
-	DWORD rcdnum;
-	int isReadyRefreshMouseOperatedPos = 0;
-	while(1)
-	{
-		//clrscr();
-		printf("*******************************\n"//宽31
-			   "(1)新游戏\n"
-			   "(2)设置\n"
-			   "(3)退出\n"
-			   "*******************************\n");
-		printf(">");
-		choiceMode = 0;
-		scanf("%d", &choiceMode);
-		if(choiceMode == 1)
-		{
-			clrscr();
-			//isSigning = 0;
-			seed = time(0);
-			//seed = 7;
-			remainder = numberOfMine;
-			SummonBoard(seed);
-			SetConsoleMouseMode(1);
-			//FlushConsoleInputBuffer(hdin);
-			showCursor(0);
-			while(1)
-			{
-				gotoxy(0, 0);
-				PrintBoard(0);
-				//getchar();
-				isEnd = 0;
-				while(1)
-				{
-					gotoxy(0, (heightOfBoard+1)/2+heightOfBoard);
-					printf("剩余雷数：%d 用时：%d \n", remainder, time(0)-seed);
-					GetNumberOfConsoleInputEvents(hdin, &rcdnum);
-					if(rcdnum == 0)
-					{
-						showCursor(0);
-						Sleep(RefreshCycle);
-						continue;
-					}
-					ReadConsoleInput(hdin, &rcd, 1, &rcdnum);
-					isReadyRefreshMouseOperatedPos = 1;
-					if(rcd.EventType == MOUSE_EVENT)
-					{
-						mousePos = rcd.Event.MouseEvent.dwMousePosition;
-						r = mousePos.Y - lengthOfColumnNumber;
-						c = (mousePos.X-1)/2 - lengthOfRowNumber;
-						if(r>=0 && r<heightOfBoard && c>=0 && c<widthOfBoard)
-						{
-							if(rcd.Event.MouseEvent.dwButtonState == FROM_LEFT_1ST_BUTTON_PRESSED)
-							{
-								if(isOpen[r][c] == 0) isOpen[r][c] = 1;
-								break;
-							}
-							else if(rcd.Event.MouseEvent.dwButtonState == RIGHTMOST_BUTTON_PRESSED)
-							{
-								isReadyRefreshMouseOperatedPos = 0;
-								if(mousePos.X >= mouseOperatedPos.X-1 && mousePos.X <= mouseOperatedPos.X+1 && mousePos.Y == mouseOperatedPos.Y);
-								else
-								{
-									if(isOpen[r][c] == 0)
-									{
-										isOpen[r][c] = 2;
-										remainder--;
-									}
-									else if(isOpen[r][c] == 2)
-									{
-										isOpen[r][c] = 0;
-										remainder++;
-									}
-									mouseOperatedPos = mousePos;
-									break;
-								}
-							}
-						}
-						else if(r>=0 && r<heightOfBoard && c < 0)//行数字
-						{
-							if(rcd.Event.MouseEvent.dwButtonState == FROM_LEFT_1ST_BUTTON_PRESSED
-								|| rcd.Event.MouseEvent.dwButtonState == RIGHTMOST_BUTTON_PRESSED)
-							{
-								if(rowNumberColor[r][c+lengthOfRowNumber] != 0x08)
-								{
-									rowNumberColor[r][c+lengthOfRowNumber] = 0x08;
-								}
-								else if(rowNumber[r][c+lengthOfRowNumber] == widthOfBoard)
-								{
-									rowNumberColor[r][c+lengthOfRowNumber] = 0x01;
-								}
-								else if(rowNumber[r][c+lengthOfRowNumber] > widthOfBoard/2)
-								{
-									rowNumberColor[r][c+lengthOfRowNumber] = 0x02;
-								}
-								else if(rowNumber[r][c+lengthOfRowNumber] > widthOfBoard/3)
-								{
-									rowNumberColor[r][c+lengthOfRowNumber] = 0x04;
-								}
-								else
-								{
-									rowNumberColor[r][c+lengthOfRowNumber] = 0x07;
-								}
-								break;
-							}
-						}
-						else if(r < 0 && c>=0 && c<widthOfBoard)//列数字
-						{
-							if(rcd.Event.MouseEvent.dwButtonState == FROM_LEFT_1ST_BUTTON_PRESSED
-								|| rcd.Event.MouseEvent.dwButtonState == RIGHTMOST_BUTTON_PRESSED)
-							{
-								if(columnNumberColor[r+lengthOfColumnNumber][c] != 0x08)
-								{
-									columnNumberColor[r+lengthOfColumnNumber][c] = 0x08;
-								}
-								else if(columnNumber[r+lengthOfColumnNumber][c] == heightOfBoard)
-								{
-									columnNumberColor[r+lengthOfColumnNumber][c] = 0x01;
-								}
-								else if(columnNumber[r+lengthOfColumnNumber][c] > heightOfBoard/2)
-								{
-									columnNumberColor[r+lengthOfColumnNumber][c] = 0x02;
-								}
-								else if(columnNumber[r+lengthOfColumnNumber][c] > heightOfBoard/3)
-								{
-									columnNumberColor[r+lengthOfColumnNumber][c] = 0x04;
-								}
-								else
-								{
-									columnNumberColor[r+lengthOfColumnNumber][c] = 0x07;
-								}
-								break;
-							}
-						}
-					}
-					else if(rcd.EventType == KEY_EVENT && rcd.Event.KeyEvent.bKeyDown == 1)
-					{
-						if(rcd.Event.KeyEvent.wVirtualKeyCode == ' ')
-						{
-							if(CheckSign() == 1)
-							{
-								isEnd = 1;
-								break;
-							}
-						}
-						else if(rcd.Event.KeyEvent.wVirtualKeyCode == '\t')
-						{
-							SolveStep();
-							break;
-						}
-					}
-					if(isReadyRefreshMouseOperatedPos == 1)
-					{
-						mouseOperatedPos.X = 0;
-						mouseOperatedPos.Y = 0;
-					}
-					showCursor(0);
-					Sleep(RefreshCycle);
-				}
-				if(r>=0 && r<heightOfBoard && c>=0 && c<widthOfBoard
-					&& isMine[r][c] == 1 && isOpen[r][c] == 1)
-				{
-					break;//翻开雷失败
-				}
-				if(isEnd == 1) break;//标记校验成功
-				isEnd = 1;//翻开所有非雷方块成功
-				for(r=0; r<heightOfBoard; r++)
-				{
-					for(c=0; c<widthOfBoard; c++)
-					{
-						if(isMine[r][c] == 0 && isOpen[r][c] != 1)
-						{
-							isEnd = 0;//存在未翻开的非雷方块
-						}
-					}
-				}
-				if(isEnd == 1) break;
-			}
-			clrscr();
-			gotoxy(0, 0);
-			PrintBoard(1);
-			if(isEnd == 1) printf(":)\nYou Win!\n");
-			else printf(":(\nGame Over!\n");
-			printf("用时：%d\n", time(0)-seed);
-			SetConsoleMouseMode(0);
-			showCursor(1);
-			fflush(stdin);
-		}
-		else if(choiceMode == 2)
-		{
-			printf("*******************************\n");//宽31
-			printf("(1)初级： 6*6  - 27\n");
-			printf("(2)中级：10*10 - 64\n");
-			printf("(3)高级：12*15 - 90\n");
-			printf("(4)专家：15*20 -148\n");
-			printf("(5)自定义\n");
-			printf("*******************************\n");
-			printf("当前难度:%d*%d-%d|密度:%.2f\n", heightOfBoard, widthOfBoard, numberOfMine, (float)numberOfMine/heightOfBoard/widthOfBoard);
-			printf(">");
-			scanf("%d", &temp);
-			if(temp == 1)
-			{
-				heightOfBoard = 6;
-				widthOfBoard = 6;
-				numberOfMine = 27;
-			}
-			else if(temp == 2)
-			{
-				heightOfBoard = 10;
-				widthOfBoard = 10;
-				numberOfMine = 64;
-			}
-			else if(temp == 3)
-			{
-				heightOfBoard = 12;
-				widthOfBoard = 15;
-				numberOfMine = 90;
-			}
-			else if(temp == 4)
-			{
-				heightOfBoard = 15;
-				widthOfBoard = 20;
-				numberOfMine = 148;
-			}
-			else if(temp == 5)
-			{
-				printf("[行数]>");
-				scanf("%d", &heightOfBoard);
-				printf("[列数]>");
-				scanf("%d", &widthOfBoard);
-				printf("[雷数]>");
-				scanf("%d", &numberOfMine);
-				if(heightOfBoard < 1) heightOfBoard = 1;
-				if(heightOfBoard > LimHeight) heightOfBoard = LimHeight;
-				if(widthOfBoard < 1) widthOfBoard = 1;
-				if(widthOfBoard > LimWidth) widthOfBoard = LimWidth;
-				if(numberOfMine < 0) numberOfMine = 0;
-				if(numberOfMine > heightOfBoard * widthOfBoard) numberOfMine = heightOfBoard * widthOfBoard;
-				while(numberOfMine < (heightOfBoard+1)/2 || numberOfMine < (widthOfBoard+1)/2) numberOfMine++;
-			}
-			lengthOfRowNumber = (widthOfBoard+1)/2;
-			lengthOfColumnNumber = (heightOfBoard+1)/2;
-			clrscr();
-		}
-		else if(choiceMode == 4)
-		{
-			printf("[地图生成校验：0关闭/1必存在顶满边/2必存在空线/3地图可解]>");
-			scanf("%d", &summonCheckMode);
-		}
-		else// if(choiceMode == 3)
-		{
-			break;
-		}
-	}
-	return 0;
 }
 
 /*--------------------------------
