@@ -48,6 +48,7 @@ int PutNumber(int* mine, int pos, int number);
 int* LineFirstSolutionMine();
 int* LineLastSolutionMine();
 int SolveLine(struct LinesIterator li);
+//int AirWeaveLine(struct LinesIterator li);
 int SolveStep();
 int Solve();
 
@@ -103,7 +104,7 @@ int main()
 {
 	int choiceMode;
 	int seed, r, c, isSigning;
-	int isEnd, temp, remainder;
+	int isEnd, temp, remainder, t0;
 	HANDLE hdin = GetStdHandle(STD_INPUT_HANDLE);
 	COORD mousePos = {0, 0};
 	COORD mouseOperatedPos = {0, 0};//鼠标已操作坐标，屏蔽双击
@@ -125,10 +126,9 @@ int main()
 		{
 			clrscr();
 			//isSigning = 0;
-			seed = time(0);
-			//seed = 7;
+			t0 = time(0);
 			remainder = numberOfMine;
-			SummonBoard(seed);
+			SummonBoard(t0);
 			SetConsoleMouseMode(1);
 			//FlushConsoleInputBuffer(hdin);
 			showCursor(0);
@@ -141,7 +141,7 @@ int main()
 				while(1)
 				{
 					gotoxy(0, (heightOfBoard+1)/2+heightOfBoard);
-					printf("剩余雷数：%d 用时：%d \n", remainder, time(0)-seed);
+					printf("剩余雷数：%d 用时：%d \n", remainder, time(0)-t0);
 					GetNumberOfConsoleInputEvents(hdin, &rcdnum);
 					if(rcdnum == 0)
 					{
@@ -289,7 +289,7 @@ int main()
 			PrintBoard(1);
 			if(isEnd == 1) printf(":)\nYou Win!\n");
 			else printf(":(\nGame Over!\n");
-			printf("用时：%d\n", time(0)-seed);
+			printf("用时：%d\n", time(0)-t0);
 			SetConsoleMouseMode(0);
 			showCursor(1);
 			fflush(stdin);
@@ -354,6 +354,40 @@ int main()
 		{
 			printf("[地图生成校验：0关闭/1必存在顶满边/2必存在空线/3地图可解]>");
 			scanf("%d", &summonCheckMode);
+		}
+		else if(choiceMode == 5)//标准万局测试
+		{
+			int countWin = 0;
+			int count[2][3] = {0};
+			t0 = time(0);
+			temp = summonCheckMode;
+			summonCheckMode = 0;
+			for(seed=0; seed<10000; seed++)
+			{
+				/*printf("\nseed=%d\n", seed);
+				SummonBoard(seed);
+				while(SolveStep())
+				{
+					//PrintBoard(0);
+					//getchar();
+				}
+				PrintBoard(1);
+				*/
+				printf("\rseed=%d", seed);
+				SummonBoard(seed);
+				countWin += Solve();
+				//PrintBoard(1);
+				for(r=0; r<heightOfBoard; r++)
+				{
+					for(c=0; c<widthOfBoard; c++)
+					{
+						count[isMine[r][c]][isOpen[r][c]]++;
+					}
+				}
+			}
+			printf("\n胜利数：%d 用时：%d\n", countWin, time(0)-t0);
+			printf("正确翻开%d 正确标记%d 翻开雷%d 错误标记%d\n", count[0][1], count[1][2], count[1][1], count[0][2]);
+			summonCheckMode = temp;
 		}
 		else// if(choiceMode == 3)
 		{
@@ -862,7 +896,11 @@ int* LineFirstSolutionMine()//生成标准线首解雷场
 		else
 		{
 			pos++;
-			//if(pos + lineNumber[i] > lengthOfLine)//无解情况，暂不考虑
+			if(pos + lineNumber[i] > lengthOfLine)//无解情况
+			{
+				free(mine);
+				return NULL;
+			}
 		}
 	}
 	return mine;
@@ -882,7 +920,11 @@ int* LineLastSolutionMine()//生成标准线末解雷场
 		else
 		{
 			pos--;
-			//if(pos < 0)//无解情况，暂不考虑
+			if(pos < 0)//无解情况
+			{
+				free(mine);
+				return NULL;
+			}
 		}
 	}
 	return mine;
@@ -924,52 +966,341 @@ int SolveLine(struct LinesIterator li)
 		printf("\n");
 	}
 	//端向心分析
-	int nipos;
+	int nipos, check, nstart, nend, nlimit;
+	//头向尾分析
 	ni = 0;
-	for(i=0; i<lengthOfLine; i++)//头向尾分析
+	for(i=0; i<lengthOfLine; i++)
 	{
-		if(lineOpen[i] == 0) break;
+		if(ni == countOfLineNumber)
+		{
+			for(; i<lengthOfLine; i++)//持续翻开
+			{
+				if(lineOpen[i] == 0) lineSolution[i] = 1;
+			}
+			break;
+		}
+		if(lineOpen[i] == 0)
+		{
+			if(lineNumber[ni] == 1)//次1判断
+			{
+				if(i+1 < lengthOfLine && lineOpen[i+1] == 2)
+				{
+					lineSolution[i] = 1;
+					i += 2;
+					if(i < lengthOfLine && lineOpen[i] == 0) lineSolution[i] = 1;
+					ni++;
+				}
+				else break;//该位置可为1，不确定，退出
+			}
+			else//大数预置分析
+			{
+				nipos = i;
+				check = 0;
+				for(i = nipos+lineNumber[ni]-1; i > nipos; i--)
+				{
+					if(lineOpen[i] == 1)//未知方块连块不能容纳该数
+					{
+						check = 1;
+						for(; i >= nipos; i--)
+						{
+							if(lineOpen[i] == 0) lineSolution[i] = 1;
+						}
+					}
+				}
+				if(check == 1)
+				{
+					for(i = nipos+lineNumber[ni]-1; lineOpen[i] != 1; i--);
+					continue;//定位到最后一个翻开并继续
+				}
+				for(i = nipos+1; i < nipos+lineNumber[ni]; i++)
+				{
+					if(lineOpen[i] == 2)
+					{
+						check = 2;
+						nstart = i;
+						for(; i < nipos+lineNumber[ni]; i++)//顺延标记
+						{
+							if(lineOpen[i] == 0) lineSolution[i] = 2;
+						}
+					}
+				}
+				if(check == 0) break;
+				/*标记连块数a = nend-nstart+1，边缘区长n-a
+				后部为nend+1(头)到(尾)nend+n-a = nstart+n-1
+				前部为nstart-1(尾)到(头)nstart-n+a = nend-n+1
+				限制偏移量b = nstart+n-1-nlimit+1 = nstart+n-nlimit
+				回顶标记区域nstart-1(尾)到(头)nstart-b = nlimit-n
+				前向翻开区域nipos(头)到(尾)nend-n*/
+				//计算标记连块尾位置和限制位置
+				nend = nipos+lineNumber[ni]-1;
+				for(i = nipos+lineNumber[ni]; i<lengthOfLine; i++)
+				{
+					if(lineOpen[i] == 2) nend = i;
+					else break;
+				}
+				if(nend-nstart+1 == lineNumber[ni]) nlimit = nend+1;//数字确定
+				else
+				{
+					nlimit = nstart+lineNumber[ni];
+					for(i = nend+1; i < nstart+lineNumber[ni]; i++)
+					{
+						if(i == lengthOfLine)
+						{
+							nlimit = lengthOfLine;
+							break;
+						}
+						else if(lineOpen[i] == 1)
+						{
+							nlimit = i;
+							break;
+						}
+					}
+				}
+				//执行操作
+				for(i = nipos; i <= nend-lineNumber[ni]; i++)//前向翻开
+				{
+					if(lineOpen[i] == 0) lineSolution[i] = 1;
+				}
+				for(i = nlimit-lineNumber[ni]; i < nstart; i++)//回顶标记
+				{
+					if(lineOpen[i] == 0) lineSolution[i] = 2;
+				}
+				if(nend-nstart+1 == lineNumber[ni] && nend+1 < lengthOfLine)//数字确定尾部翻开
+				{
+					if(lineOpen[nend+1] == 0) lineSolution[nend+1] = 1;
+				}
+				//判断是否继续
+				ni++;
+				i = nlimit;
+				break;//直接退出
+				/*if(nend-nstart+1 == lineNumber[ni]//确保限制为翻开
+					|| (nlimit < lengthOfLine && lineOpen[nlimit] == 1))
+				{
+					if(nlimit <= nend+2) continue;//数字确定或空悬一格
+					else if(ni < countOfLineNumber && lineNumber[ni] > nlimit-nend-2)
+					{
+						//剩余空间无法容纳新数字，可放置位置从nend+2到nlimit-1，长度nlimit-1-nend-2+1
+						continue;
+					}
+					else break;
+				}
+				else break;*/
+			}
+		}
 		else if(lineOpen[i] == 2)
 		{
 			for(nipos = i; i < nipos+lineNumber[ni]; i++)//顺延标记
 			{
-				if(lineOpen[i] != 2) lineSolution[i] = 2;
+				if(lineOpen[i] == 0) lineSolution[i] = 2;
 			}
-			if(nipos+lineNumber[ni] < lengthOfLine && lineOpen[nipos+lineNumber[ni]] != 1)//尾部翻开
+			if(nipos+lineNumber[ni] < lengthOfLine && lineOpen[nipos+lineNumber[ni]] == 0)//尾部翻开
 			{
 				lineSolution[nipos+lineNumber[ni]] = 1;
 			}
 			ni++;
 			//i定位到超尾之后
-			if(ni == countOfLineNumber)
-			{
-				for(; i<lengthOfLine; i++)//持续翻开
-				{
-					if(lineOpen[i] != 1) lineSolution[i] = 1;
-				}
-			}
 		}
 	}
-	ni = countOfLineNumber-1;
-	for(i=lengthOfLine-1; i>=0; i--)//尾向头分析
+	if(ni < countOfLineNumber)
 	{
-		if(lineOpen[i] == 0) break;
+		if(lineNumber[ni] == 1)
+		{
+			int nj;
+			check = 1;//记录连续1数
+			for(nj=ni+1; nj<countOfLineNumber; nj++)
+			{
+				if(lineNumber[nj] == 1) check++;
+				else break;
+			}
+			if(nj == countOfLineNumber)//全1判断
+			{
+				for(; i<lengthOfLine; i++)
+				{
+					if(lineOpen[i] == 2)//前后翻开
+					{
+						if(lineOpen[i-1] == 0) lineSolution[i-1] = 1;
+						if(i+1 < lengthOfLine && lineOpen[i+1] == 0) lineSolution[i+1] = 1;
+					}
+				}
+			}
+			/*else if(check > 1)//连1判断
+			{
+				for(; check>0; check--)
+				{
+					while(i<lengthOfLine && lineOpen[i] == 1) i++;//滑过翻开方块
+					if(lineOpen[i] == 2)//前后翻开
+					{
+						if(lineOpen[i-1] == 0) lineSolution[i-1] = 1;
+						if(i+1 < lengthOfLine && lineOpen[i+1] == 0) lineSolution[i+1] = 1;
+						i+=2;
+					}
+					else if(lineOpen[i] == 0)
+					{
+						if(lineOpen[i+1] != 2)//连续两个未知方块或单个未知方块和翻开
+						{
+							i+=2;
+						}
+						else//未知方块尾随标记
+						{
+							i++;//定位到标记
+							if(lineOpen[i-1] == 0) lineSolution[i-1] = 1;
+							if(i+1 < lengthOfLine && lineOpen[i+1] == 0) lineSolution[i+1] = 1;
+							i+=2;
+						}
+					}
+				}
+			}*/
+		}
+	}
+	//尾向头分析
+	ni = countOfLineNumber-1;
+	for(i=lengthOfLine-1; i>=0; i--)
+	{
+		if(ni < 0)
+		{
+			for(; i>=0; i--)//持续翻开
+			{
+				if(lineOpen[i] == 0) lineSolution[i] = 1;
+			}
+			break;
+		}
+		if(lineOpen[i] == 0)
+		{
+			//break;
+			if(lineNumber[ni] == 1)//次1判断
+			{
+				if(i > 0 && lineOpen[i-1] == 2)
+				{
+					lineSolution[i] = 1;
+					i -= 2;
+					if(i >= 0 && lineOpen[i] == 0) lineSolution[i] = 1;
+					ni--;
+				}
+				else break;//该位置可为1，不确定，退出
+			}
+			else//大数预置分析
+			{
+				nipos = i;
+				check = 0;
+				for(i = nipos-lineNumber[ni]+1; i < nipos; i++)
+				{
+					if(lineOpen[i] == 1)//未知方块连块不能容纳该数
+					{
+						check = 1;
+						for(; i <= nipos; i++)
+						{
+							if(lineOpen[i] == 0) lineSolution[i] = 1;
+						}
+					}
+				}
+				if(check == 1)
+				{
+					for(i = nipos-lineNumber[ni]+1; lineOpen[i] != 1; i++);
+					continue;//定位到最后一个翻开并继续
+				}
+				for(i = nipos-1; i > nipos-lineNumber[ni]; i--)
+				{
+					if(lineOpen[i] == 2)
+					{
+						check = 2;
+						nstart = i;
+						for(; i > nipos-lineNumber[ni]; i--)//顺延标记
+						{
+							if(lineOpen[i] == 0) lineSolution[i] = 2;
+						}
+					}
+				}
+				if(check == 0) break;
+				//break;
+				//计算标记连块尾位置和限制位置
+				nend = nipos-lineNumber[ni]+1;
+				for(i = nipos-lineNumber[ni]; i>=0; i--)
+				{
+					if(lineOpen[i] == 2) nend = i;
+					else break;
+				}
+				if(nend-nstart+1 == lineNumber[ni]) nlimit = nend-1;//数字确定
+				else
+				{
+					nlimit = nstart-lineNumber[ni];
+					for(i = nend-1; i > nstart-lineNumber[ni]; i--)
+					{
+						if(i == -1)
+						{
+							nlimit = -1;
+							break;
+						}
+						else if(lineOpen[i] == 1)
+						{
+							nlimit = i;
+							break;
+						}
+					}
+				}
+				//执行操作
+				for(i = nipos; i >= nend+lineNumber[ni]; i--)//前向翻开
+				{
+					if(lineOpen[i] == 0) lineSolution[i] = 1;
+				}
+				for(i = nlimit+lineNumber[ni]; i > nstart; i--)//回顶标记
+				{
+					if(lineOpen[i] == 0) lineSolution[i] = 2;
+				}
+				if(nend-nstart+1 == lineNumber[ni] && nend > 0)//数字确定尾部翻开
+				{
+					if(lineOpen[nend-1] == 0) lineSolution[nend-1] = 1;
+				}
+				//判断是否继续
+				ni--;
+				i = nlimit;
+				break;//直接退出
+				/*if(nend-nstart+1 == lineNumber[ni]//确保限制为翻开
+					|| (nlimit >= 0 && lineOpen[nlimit] == 1))
+				{
+					if(nlimit >= nend-2) continue;//数字确定或空悬一格
+					else if(ni >= 0 && lineNumber[ni] > nlimit+nend+2)
+					{
+						//剩余空间无法容纳新数字，可放置位置从nend+2到nlimit-1，长度nlimit-1-nend-2+1
+						continue;
+					}
+					else break;
+				}
+				else break;*/
+			}
+		}
 		else if(lineOpen[i] == 2)
 		{
 			for(nipos = i; i > nipos-lineNumber[ni]; i--)//顺延标记
 			{
-				if(lineOpen[i] != 2) lineSolution[i] = 2;
+				if(lineOpen[i] == 0) lineSolution[i] = 2;
 			}
-			if(nipos-lineNumber[ni] >= 0 && lineOpen[nipos-lineNumber[ni]] != 1)//头部翻开
+			if(nipos-lineNumber[ni] >= 0 && lineOpen[nipos-lineNumber[ni]] == 0)//头部翻开
 			{
 				lineSolution[nipos-lineNumber[ni]] = 1;
 			}
 			ni--;
-			if(ni < 0)
+		}
+	}
+	if(ni >= 0)
+	{
+		if(lineNumber[ni] == 1)
+		{
+			int nj;
+			check = 1;//记录连续1数
+			for(nj=ni-1; nj>=0; nj--)
 			{
-				for(; i>=0; i--)//持续翻开
+				if(lineNumber[nj] == 1) check++;
+				else break;
+			}
+			if(nj == -1)//全1判断
+			{
+				for(; i>=0; i--)
 				{
-					if(lineOpen[i] != 1) lineSolution[i] = 1;
+					if(lineOpen[i] == 2)//前后翻开
+					{
+						if(i > 0 && lineOpen[i-1] == 0) lineSolution[i-1] = 1;
+						if(lineOpen[i+1] == 0) lineSolution[i+1] = 1;
+					}
 				}
 			}
 		}
@@ -977,66 +1308,75 @@ int SolveLine(struct LinesIterator li)
 	//首末解交汇分析
 	int* firstMine = LineFirstSolutionMine();//生成首解雷场
 	int* lastMine = LineLastSolutionMine();//生成末解雷场
-	int matchFirstLast = 1;
-	for(i=0; i<lengthOfLine; i++)
+	if(firstMine != NULL && lastMine != NULL)
 	{
-		if(firstMine[i] != lastMine[i]) matchFirstLast = 0;
-	}
-	if(matchFirstLast == 1)//首解末解完全相同，可判断端收束顶满线
-	{
+		int matchFirstLast = 1;
 		for(i=0; i<lengthOfLine; i++)
 		{
-			if(firstMine[i] == 1 && lineOpen[i] != 2) lineSolution[i] = 2;
-			if(firstMine[i] == 0 && lineOpen[i] != 1) lineSolution[i] = 1;
+			if(firstMine[i] != lastMine[i]) matchFirstLast = 0;
+		}
+		if(matchFirstLast == 1)//首解末解完全相同，可判断端收束顶满线
+		{
+			for(i=0; i<lengthOfLine; i++)
+			{
+				if(firstMine[i] == 1 && lineOpen[i] == 0) lineSolution[i] = 2;
+				if(firstMine[i] == 0 && lineOpen[i] == 0) lineSolution[i] = 1;
+			}
+		}
+		else
+		{
+			//简单数字分析，可判断大数半满偏移
+			int n1pos = 0, n2pos = 0;
+			for(ni=0; ni<countOfLineNumber; ni++)
+			{
+				while(n1pos+lineNumber[ni] < lengthOfLine && firstMine[n1pos] == 0) n1pos++;
+				while(n2pos+lineNumber[ni] < lengthOfLine && lastMine[n2pos] == 0) n2pos++;
+				if(n1pos == n2pos)//数字确定
+				{
+					if(n1pos > 0 && lineOpen[n1pos-1] == 0)//头部翻开
+					{
+						lineSolution[n1pos-1] = 1;
+					}
+					for(i=n1pos; i < n1pos+lineNumber[ni]; i++)//中部标记
+					{
+						if(lineOpen[i] == 0) lineSolution[i] = 2;
+					}
+					if(n1pos+lineNumber[ni] < lengthOfLine && lineOpen[n1pos+lineNumber[ni]] == 0)//尾部翻开
+					{
+						lineSolution[n1pos+lineNumber[ni]] = 1;
+					}
+				}
+				else if(n2pos - n1pos < lineNumber[ni])//数字中部确定
+				{
+					for(i=n2pos; i < n1pos+lineNumber[ni]; i++)//中部标记
+					{
+						if(lineOpen[i] == 0) lineSolution[i] = 2;
+					}
+				}
+				if(ni == 0 && n1pos > 0)//线首翻开
+				{
+					for(i=0; i<n1pos; i++)
+					{
+						if(lineOpen[i] == 0) lineSolution[i] = 1;
+					}
+				}
+				if(ni == countOfLineNumber-1 && n2pos+lineNumber[ni] < lengthOfLine)//线尾翻开
+				{
+					for(i=n2pos+lineNumber[ni]; i<lengthOfLine; i++)
+					{
+						if(lineOpen[i] == 0) lineSolution[i] = 1;
+					}
+				}
+				n1pos += lineNumber[ni];
+				n2pos += lineNumber[ni];
+			}
 		}
 	}
-	else
+	else//存在错误标记
 	{
-		//简单数字分析，可判断大数半满偏移
-		int n1pos = 0, n2pos = 0;
-		for(ni=0; ni<countOfLineNumber; ni++)
-		{
-			while(n1pos+lineNumber[ni] < lengthOfLine && firstMine[n1pos] == 0) n1pos++;
-			while(n2pos+lineNumber[ni] < lengthOfLine && lastMine[n2pos] == 0) n2pos++;
-			if(n1pos == n2pos)//数字确定
-			{
-				if(n1pos > 0 && lineOpen[n1pos-1] != 1)//头部翻开
-				{
-					lineSolution[n1pos-1] = 1;
-				}
-				for(i=n1pos; i < n1pos+lineNumber[ni]; i++)//中部标记
-				{
-					if(lineOpen[i] != 2) lineSolution[i] = 2;
-				}
-				if(n1pos+lineNumber[ni] < lengthOfLine && lineOpen[n1pos+lineNumber[ni]] != 1)//尾部翻开
-				{
-					lineSolution[n1pos+lineNumber[ni]] = 1;
-				}
-			}
-			else if(n2pos - n1pos < lineNumber[ni])//数字中部确定
-			{
-				for(i=n2pos; i < n1pos+lineNumber[ni]; i++)//中部标记
-				{
-					if(lineOpen[i] != 2) lineSolution[i] = 2;
-				}
-			}
-			if(ni == 0 && n1pos > 0)//线首翻开
-			{
-				for(i=0; i<n1pos; i++)
-				{
-					if(lineOpen[i] != 1) lineSolution[i] = 1;
-				}
-			}
-			if(ni == countOfLineNumber-1 && n2pos+lineNumber[ni] < lengthOfLine)//线尾翻开
-			{
-				for(i=n2pos+lineNumber[ni]; i<lengthOfLine; i++)
-				{
-					if(lineOpen[i] != 1) lineSolution[i] = 1;
-				}
-			}
-			n1pos += lineNumber[ni];
-			n2pos += lineNumber[ni];
-		}
+		if(firstMine != NULL) free(firstMine);
+		if(lastMine != NULL) free(lastMine);
+		return 0;
 	}
 	//完成分析//中级测试种子7
 	int sum1 = 0, sum2 = 0;
@@ -1060,18 +1400,24 @@ int SolveLine(struct LinesIterator li)
 	}
 	if(debug)
 	{
-		printf("首解：");
-		for(i=0; i<lengthOfLine; i++)
+		if(firstMine != NULL)
 		{
-			printf("%d ", firstMine[i]);
+			printf("首解：");
+			for(i=0; i<lengthOfLine; i++)
+			{
+				printf("%d ", firstMine[i]);
+			}
+			printf("\n");
 		}
-		printf("\n");
-		printf("末解：");
-		for(i=0; i<lengthOfLine; i++)
+		if(lastMine != NULL)
 		{
-			printf("%d ", lastMine[i]);
+			printf("末解：");
+			for(i=0; i<lengthOfLine; i++)
+			{
+				printf("%d ", lastMine[i]);
+			}
+			printf("\n");
 		}
-		printf("\n");
 		printf("  解：");
 		for(i=0; i<lengthOfLine; i++)
 		{
@@ -1086,8 +1432,8 @@ int SolveLine(struct LinesIterator li)
 	}
 	//标准线解写出
 	RecoverLine(li.r, li.c, 1);
-	free(firstMine);
-	free(lastMine);
+	if(firstMine != NULL) free(firstMine);
+	if(lastMine != NULL) free(lastMine);
 	//返回是否存在解
 	for(i=0; i<lengthOfLine; i++)
 	{
@@ -1095,7 +1441,76 @@ int SolveLine(struct LinesIterator li)
 	}
 	return 0;
 }
-
+/*
+int AirWeaveLine(struct LinesIterator li)
+{
+	int i, ni;
+	int* hasFirstSolution =(int*) calloc(countOfLineNumber, sizeof(int));//数字首解存在栈，用于回溯定位
+	int* npos =(int*) calloc(countOfLineNumber, sizeof(int));
+	int* sumMine =(int*) calloc(lengthOfLine, sizeof(int));
+	//生成标准线
+	RecoverLine(li.r, li.c, 0);
+	//遍历所有解
+	int* mine =(int*) calloc(lengthOfLine, sizeof(int));
+	int numberOfPossibility = 0;
+	int t;
+	while(1)
+	{
+		//生成下一个解
+		t = 0;
+		while(1)
+		{
+			if(PutNumber(mine, npos[t], lineNumber[t]) == 1)
+			{
+				if(t == countOfLineNumber-1)
+				{
+					//检查剩余方块无标记
+					
+					//写入和字典
+					numberOfPossibility++;
+					for(i=0; i<lengthOfLine; i++)
+					{
+						sumMine[i] += mine[i];
+					}
+					for(i=0; i<countOfLineNumber; i++)
+					{
+						hasFirstSolution[i] = 1;
+					}
+				}
+				else
+				{
+					npos[t+1] = npos[t] + lineNumber[t]+1;
+					t++;
+				}
+			}
+			else
+			{
+				npos[t]++;
+				if(npos[t] + lineNumber[t] > lengthOfLine)//无解
+				{
+					
+				}
+			}
+		}
+		
+		for(i=0; i<lengthOfLine; i++)
+		{
+			sumMine[i] += mine[i];
+			mine[i] = 0;
+		}
+	}
+	
+	//标准线解写出
+	RecoverLine(li.r, li.c, 1);
+	free(hasFirstSolution);
+	//返回是否存在解
+	for(i=0; i<lengthOfLine; i++)
+	{
+		if(lineSolution[i] != 0) return 1;
+	}
+	return 0;
+}
+*/
 int SolveStep()
 {
 	int isSolving = 0;
@@ -1104,6 +1519,13 @@ int SolveStep()
 	{
 		isSolving += SolveLine(li);
 	}
+	/*if(isSolving == 0)
+	{
+		for(li = LinesIteratorBegin(); !IsLinesIteratorEnd(li); LinesIteratorNext(&li))
+		{
+			isSolving += AirWeaveLine(li);
+		}
+	}*/
 	return isSolving != 0;
 }
 
@@ -1157,6 +1579,11 @@ Nonogram 0.4
 ——优化 颜色仅在地图生成时计算
 ——优化 地图大小上限从20*20提升到24*24
 Nonogram 0.5
+——新增 端向心分析的次1判断、大数预置分析、全1判断
+——新增 可按5执行标准万局测试
+——修复 地图求解可能标记已翻开方块
+——修复 错误标记时首末解交汇分析引起的闪退
 //——新增 拖动标记根据起始操作统一标记/取消标记
 //——修复 再次进入游戏时可能持续翻开方块
+//——修复 错误标记时引起的其他闪退
 --------------------------------*/
