@@ -990,7 +990,55 @@ int SolveLine(struct LinesIterator li)
 					if(i < lengthOfLine && lineOpen[i] == 0) lineSolution[i] = 1;
 					ni++;
 				}
-				else break;//该位置可为1，不确定，退出
+				else// break;//该位置可为1，不确定，退出
+				{
+					int nj;
+					check = 1;//记录连续1数
+					for(nj=ni+1; nj<countOfLineNumber; nj++)
+					{
+						if(lineNumber[nj] == 1) check++;
+						else break;
+					}
+					if(nj == countOfLineNumber)//全1判断
+					{
+						for(; i<lengthOfLine; i++)
+						{
+							if(lineOpen[i] == 2)//前后翻开
+							{
+								if(lineOpen[i-1] == 0) lineSolution[i-1] = 1;
+								if(i+1 < lengthOfLine && lineOpen[i+1] == 0) lineSolution[i+1] = 1;
+							}
+						}
+					}
+					else if(check > 1)//非虚悬连1判断
+					{
+						for(; check>0; check--)
+						{
+							while(i<lengthOfLine && lineOpen[i] == 1) i++;//滑过翻开方块
+							if(lineOpen[i] == 2)//前后翻开
+							{
+								if(lineOpen[i-1] == 0) lineSolution[i-1] = 1;
+								if(i+1 < lengthOfLine && lineOpen[i+1] == 0) lineSolution[i+1] = 1;
+								i+=2;
+							}
+							else if(lineOpen[i] == 0)
+							{
+								if(lineOpen[i+1] != 2)//连续两个未知方块或单个未知方块和翻开
+								{
+									i+=2;
+								}
+								else//未知方块尾随标记
+								{
+									i++;//定位到标记
+									if(lineOpen[i-1] == 0) lineSolution[i-1] = 1;
+									if(i+1 < lengthOfLine && lineOpen[i+1] == 0) lineSolution[i+1] = 1;
+									i+=2;
+								}
+							}
+						}
+					}//需要i回溯或处理衔接，复杂且效益不高
+					break;
+				}
 			}
 			else//大数预置分析
 			{
@@ -1072,9 +1120,9 @@ int SolveLine(struct LinesIterator li)
 				//判断是否继续
 				ni++;
 				i = nlimit;
-				break;//直接退出
-				/*if(nend-nstart+1 == lineNumber[ni]//确保限制为翻开
-					|| (nlimit < lengthOfLine && lineOpen[nlimit] == 1))
+				//break;//直接退出
+				if(nend-nstart+1 == lineNumber[ni-1]) continue;
+				else if(nlimit < lengthOfLine && lineOpen[nlimit] == 1)//确保限制为翻开
 				{
 					if(nlimit <= nend+2) continue;//数字确定或空悬一格
 					else if(ni < countOfLineNumber && lineNumber[ni] > nlimit-nend-2)
@@ -1084,7 +1132,7 @@ int SolveLine(struct LinesIterator li)
 					}
 					else break;
 				}
-				else break;*/
+				else break;
 			}
 		}
 		else if(lineOpen[i] == 2)
@@ -1150,6 +1198,8 @@ int SolveLine(struct LinesIterator li)
 					}
 				}
 			}*/
+			/*大数预置分析退出后连1判断需要i回溯或处理衔接，还有虚悬1，复杂且效益不高，故仅在次1判断退出后进行
+			虚悬1：数字1 1 4标记1 1 2，中1虚悬，左1可判*/
 		}
 	}
 	//尾向头分析
@@ -1176,7 +1226,55 @@ int SolveLine(struct LinesIterator li)
 					if(i >= 0 && lineOpen[i] == 0) lineSolution[i] = 1;
 					ni--;
 				}
-				else break;//该位置可为1，不确定，退出
+				else// break;//该位置可为1，不确定，退出
+				{
+					int nj;
+					check = 1;//记录连续1数
+					for(nj=ni-1; nj>=0; nj--)
+					{
+						if(lineNumber[nj] == 1) check++;
+						else break;
+					}
+					if(nj == -1)//全1判断
+					{
+						for(; i>=0; i--)
+						{
+							if(lineOpen[i] == 2)//前后翻开
+							{
+								if(i > 0 && lineOpen[i-1] == 0) lineSolution[i-1] = 1;
+								if(lineOpen[i+1] == 0) lineSolution[i+1] = 1;
+							}
+						}
+					}
+					else if(check > 1)//非虚悬连1判断
+					{
+						for(; check>0; check--)
+						{
+							while(i>=0 && lineOpen[i] == 1) i--;//滑过翻开方块
+							if(lineOpen[i] == 2)//前后翻开
+							{
+								if(i > 0 && lineOpen[i-1] == 0) lineSolution[i-1] = 1;
+								if(lineOpen[i+1] == 0) lineSolution[i+1] = 1;
+								i-=2;
+							}
+							else if(lineOpen[i] == 0)
+							{
+								if(lineOpen[i-1] != 2)//连续两个未知方块或单个未知方块和翻开
+								{
+									i-=2;
+								}
+								else//未知方块尾随标记
+								{
+									i--;//定位到标记
+									if(i > 0 && lineOpen[i-1] == 0) lineSolution[i-1] = 1;
+									if(lineOpen[i+1] == 0) lineSolution[i+1] = 1;
+									i-=2;
+								}
+							}
+						}
+					}
+					break;
+				}
 			}
 			else//大数预置分析
 			{
@@ -1253,9 +1351,9 @@ int SolveLine(struct LinesIterator li)
 				//判断是否继续
 				ni--;
 				i = nlimit;
-				break;//直接退出
-				/*if(nend-nstart+1 == lineNumber[ni]//确保限制为翻开
-					|| (nlimit >= 0 && lineOpen[nlimit] == 1))
+				//break;//直接退出
+				if(nend-nstart+1 == lineNumber[ni+1]) continue;
+				else if(nlimit >= 0 && lineOpen[nlimit] == 1)//确保限制为翻开
 				{
 					if(nlimit >= nend-2) continue;//数字确定或空悬一格
 					else if(ni >= 0 && lineNumber[ni] > nlimit+nend+2)
@@ -1265,7 +1363,7 @@ int SolveLine(struct LinesIterator li)
 					}
 					else break;
 				}
-				else break;*/
+				else break;
 			}
 		}
 		else if(lineOpen[i] == 2)
@@ -1303,6 +1401,33 @@ int SolveLine(struct LinesIterator li)
 					}
 				}
 			}
+			/*else if(check > 1)//连1判断
+			{
+				for(; check>0; check--)
+				{
+					while(i>=0 && lineOpen[i] == 1) i--;//滑过翻开方块
+					if(lineOpen[i] == 2)//前后翻开
+					{
+						if(i > 0 && lineOpen[i-1] == 0) lineSolution[i-1] = 1;
+						if(lineOpen[i+1] == 0) lineSolution[i+1] = 1;
+						i-=2;
+					}
+					else if(lineOpen[i] == 0)
+					{
+						if(lineOpen[i-1] != 2)//连续两个未知方块或单个未知方块和翻开
+						{
+							i-=2;
+						}
+						else//未知方块尾随标记
+						{
+							i--;//定位到标记
+							if(i > 0 && lineOpen[i-1] == 0) lineSolution[i-1] = 1;
+							if(lineOpen[i+1] == 0) lineSolution[i+1] = 1;
+							i-=2;
+						}
+					}
+				}
+			}*/
 		}
 	}
 	//首末解交汇分析
@@ -1583,6 +1708,9 @@ Nonogram 0.5
 ——新增 可按5执行标准万局测试
 ——修复 地图求解可能标记已翻开方块
 ——修复 错误标记时首末解交汇分析引起的闪退
+Nonogram 0.6
+——新增 端向心分析的非虚悬连1判断
+——新增 大数预置分析后继续分析
 //——新增 拖动标记根据起始操作统一标记/取消标记
 //——修复 再次进入游戏时可能持续翻开方块
 //——修复 错误标记时引起的其他闪退
