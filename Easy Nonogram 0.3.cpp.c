@@ -1,3 +1,4 @@
+#include <stdio.h>
 #include <stdlib.h>
 #include <time.h>
 #include <graphics.h>
@@ -33,12 +34,15 @@ int lengthOfColumnNumber = 3;
 
 int sideLength = 32;
 
+int cursorR = InvalidPosition, cursorC = InvalidPosition;
+
 //int debug = 0;
 
 void DrawBlock(int r, int c, int isMine, int isOpen);
 void DrawWindow(int mode, int time, color_t timeColor);
 void InitWindow(int mode);
 void Operate(char operation, int r, int c);
+int IsMousePosOutside();
 
 void SummonBoard(int seed);
 int CheckSign();
@@ -63,7 +67,7 @@ int main()
 	mouse_msg mouseMsg;
 	key_msg keyMsg;
 	char operation;
-	int r, c, isEnd, t0;
+	int r, c, isEnd, t0, t1;
 	int r1 = InvalidPosition, c1 = InvalidPosition, r2 = InvalidPosition, c2 = InvalidPosition;
 	// 设置难度
 	InitWindow(0);
@@ -72,7 +76,7 @@ int main()
 	xyprintf(0, 1*sideLength, "中级：10*10 - 64");
 	xyprintf(0, 2*sideLength, "高级：12*15 - 90");
 	xyprintf(0, 3*sideLength, "专家：15*20 - 148");
-	xyprintf(0, 4*sideLength, "最大：24*24 - 288");
+	xyprintf(0, 4*sideLength, "自定义");
 	int difficulty = -1;
 	while(difficulty == -1)
 	{
@@ -116,6 +120,19 @@ int main()
 		heightOfBoard = 24;
 		widthOfBoard = 24;
 		numberOfMine = 288;
+		char str[128];
+		resizewindow(13*sideLength, 10*sideLength);
+		inputbox_getline("自定义难度输入框",
+			"[行数] [列数] [雷数]\n注意空格，输入后回车。\n"
+			"最大地图24*24，某些难度可能难以生成可解地图。\n"
+			"什么？输入框太丑？请到https://github.com/wysaid/xege反馈！", str, 128);
+		sscanf(str, "%d%d%d", &heightOfBoard, &widthOfBoard, &numberOfMine);
+		if(heightOfBoard < 1) heightOfBoard = 1;
+		if(heightOfBoard > LimHeight) heightOfBoard = LimHeight;
+		if(widthOfBoard < 1) widthOfBoard = 1;
+		if(widthOfBoard > LimWidth) widthOfBoard = LimWidth;
+		if(numberOfMine < 0) numberOfMine = 0;
+		if(numberOfMine > heightOfBoard * widthOfBoard) numberOfMine = heightOfBoard * widthOfBoard;
 	}
 	lengthOfRowNumber = (widthOfBoard+1)/2;
 	lengthOfColumnNumber = (heightOfBoard+1)/2;
@@ -130,7 +147,8 @@ int main()
 		flushkey();
 		while(1)
 		{
-			DrawWindow(0, time(0)-t0, WHITE);
+			t1 = time(0);
+			DrawWindow(0, t1-t0, WHITE);
 			if(r1 != InvalidPosition && c1 != InvalidPosition && (r1 == r2 || c1 == c2))
 			{
 				setcolor(BLUE);
@@ -140,6 +158,11 @@ int main()
 			}
 			operation = 0;
 			isEnd = 0;
+			if(IsMousePosOutside())
+			{
+				cursorR = InvalidPosition;
+				cursorC = InvalidPosition;
+			}
 			while(mousemsg())
 			{
 				mouseMsg = getmouse();
@@ -147,6 +170,8 @@ int main()
 				c = mouseMsg.x / sideLength - lengthOfRowNumber;
 				r2 = r;
 				c2 = c;
+				cursorR = r;
+				cursorC = c;
 				if(mouseMsg.is_down())
 				{
 					r1 = r;
@@ -163,7 +188,7 @@ int main()
 					else if(sideLength > 16) sideLength -= 4;
 					resizewindow((lengthOfRowNumber+widthOfBoard)*sideLength, (lengthOfColumnNumber+heightOfBoard)*sideLength);
 					setfont(sideLength, 0, "Consolas");
-					DrawWindow(0, time(0)-t0, WHITE);
+					DrawWindow(0, t1-t0, WHITE);
 				}
 			}
 			while(kbmsg())
@@ -257,19 +282,27 @@ int main()
 			if(isEnd == 1) break;//翻开所有非雷方块成功
 			delay_ms(RefreshCycle);
 		}
-		if(isEnd == 1) DrawWindow(1, time(0)-t0, YELLOW);
-		else DrawWindow(1, time(0)-t0, RED);
-		setfont(sideLength/2, 0, "黑体");
-		setcolor(RED);
-		xyprintf(sideLength/4, sideLength, "左键新游戏");
-		xyprintf(sideLength/4, sideLength*3/2, "右键关闭窗口");
-		setfont(sideLength, 0, "Consolas");
+		t1 = time(0);
 		newGame = -1;
 		while(newGame == -1)
 		{
+			if(isEnd == 1) DrawWindow(1, t1-t0, YELLOW);
+			else DrawWindow(1, t1-t0, RED);
+			setfont(sideLength/2, 0, "黑体");
+			setcolor(RED);
+			xyprintf(sideLength/4, sideLength, "左键新游戏");
+			xyprintf(sideLength/4, sideLength*3/2, "右键关闭窗口");
+			setfont(sideLength, 0, "Consolas");
+			if(IsMousePosOutside())
+			{
+				cursorR = InvalidPosition;
+				cursorC = InvalidPosition;
+			}
 			while(mousemsg())
 			{
 				mouseMsg = getmouse();
+				cursorR = mouseMsg.y / sideLength - lengthOfColumnNumber;
+				cursorC = mouseMsg.x / sideLength - lengthOfRowNumber;
 				if(mouseMsg.is_up())
 				{
 					if(mouseMsg.is_left()) newGame = 1;
@@ -282,7 +315,8 @@ int main()
 					else if(sideLength > 16) sideLength -= 4;
 					resizewindow((lengthOfRowNumber+widthOfBoard)*sideLength, (lengthOfColumnNumber+heightOfBoard)*sideLength);
 					setfont(sideLength, 0, "Consolas");
-					DrawWindow(0, time(0)-t0, WHITE);
+					if(isEnd == 1) DrawWindow(1, t1-t0, YELLOW);
+					else DrawWindow(1, t1-t0, RED);
 				}
 			}
 			delay_ms(RefreshCycle);
@@ -412,6 +446,23 @@ void DrawWindow(int mode, int time, color_t timeColor)
 	//用时
 	setcolor(timeColor);
 	xyprintf(sideLength/4, 0, "%ds", time);
+	//悬浮高亮
+	if(cursorR != InvalidPosition && cursorC != InvalidPosition)
+	{
+		setfillcolor(EGERGBA(0xff, 0xff, 0xff, 0x10));
+		if(cursorR >= 0)//高亮行
+		{
+			ege_fillrect(0, (lengthOfColumnNumber+cursorR)*sideLength, (lengthOfRowNumber+widthOfBoard)*sideLength, sideLength);
+		}
+		if(cursorC >= 0)//高亮列
+		{
+			ege_fillrect((lengthOfRowNumber+cursorC)*sideLength, 0, sideLength, (lengthOfColumnNumber+heightOfBoard)*sideLength);
+		}
+		if((cursorR >= 0 && cursorC < 0) || (cursorR < 0 && cursorC >= 0))//高亮方块
+		{
+			ege_fillrect((lengthOfRowNumber+cursorC)*sideLength, (lengthOfColumnNumber+cursorR)*sideLength, sideLength, sideLength);
+		}
+	}
 }
 
 void InitWindow(int mode)
@@ -440,6 +491,7 @@ void InitWindow(int mode)
 		initgraph(10*sideLength, 5*sideLength, INIT_RENDERMANUAL);
 		setbkcolor(EGERGB(18, 18, 18));
 		setfont(sideLength, 0, "Consolas");
+		setbkmode(TRANSPARENT);
 		ege_enable_aa(true);
 	}
 	else
@@ -508,6 +560,20 @@ void Operate(char operation, int r, int c)
 			columnNumberColor[r+lengthOfColumnNumber][c] = WHITE;
 		}
 	}
+}
+
+int IsMousePosOutside()//鼠标在窗口边界外
+{
+	//EGE无法区分鼠标静止和鼠标在窗口边界外，调用WindowsAPI
+	HWND hwnd = getHWnd();//获取绘图窗口句柄
+	RECT rect;
+	POINT point;
+	GetWindowRect(hwnd, &rect);//获取窗口四角坐标
+	GetCursorPos(&point);//获取鼠标屏幕坐标
+	return (point.x < rect.left || point.x > rect.right || point.y < rect.top || point.y > rect.bottom);
+	//ScreenToClient(hwnd, &point);//转换为窗口坐标
+	//窗口大小rect.right-rect.left+1, rect.bottom-rect.top+1
+	//return (point.x <= 0 || point.x > rect.right-rect.left || point.y <= 0 || point.y > rect.bottom-rect.top);
 }
 
 void SummonBoard(int seed)
@@ -1441,4 +1507,8 @@ Easy Nonogram 0.2
 ——新增 Ctrl+滚轮调整显示大小
 ——优化 错误标记线条
 ——优化 全局抗锯齿
+Easy Nonogram 0.3
+——新增 鼠标悬浮高亮
+——新增 自定义难度
+——修复 终局后的Ctrl+滚轮异常改变时间
 --------------------------------*/
