@@ -1,6 +1,8 @@
+//#define _WIN32_WINNT 0xa00//使用SetProcessDPIAware()
 #include <stdio.h>
 #include <stdlib.h>
 #include <time.h>
+#include <math.h>
 #include <graphics.h>
 
 #define LimHeight 24
@@ -39,6 +41,8 @@ int cursorR = InvalidPosition, cursorC = InvalidPosition;
 //int debug = 0;
 
 void DrawBlock(int r, int c, int isMine, int isOpen);
+void DrawLineA(int x0, int y0, int r, int angle);
+void DrawClock(int x0, int y0, int r);
 void DrawWindow(int mode, int time, color_t timeColor);
 void InitWindow(int mode);
 void Operate(char operation, int r, int c);
@@ -77,55 +81,82 @@ int main()
 	xyprintf(0, 2*sideLength, "高级：12*15 - 90");
 	xyprintf(0, 3*sideLength, "专家：15*20 - 148");
 	xyprintf(0, 4*sideLength, "自定义");
+	/*setfont(sideLength*15/16, 0, "黑体");
+	xyprintf(0, 0*sideLength, "初级：");
+	xyprintf(0, 1*sideLength, "中级：");
+	xyprintf(0, 2*sideLength, "高级：");
+	xyprintf(0, 3*sideLength, "专家：");
+	xyprintf(0, 4*sideLength, "自定义");
+	setfont(sideLength, 0, "Consolas");
+	xyprintf(3*sideLength, 0*sideLength, " 6*6  - 27");
+	xyprintf(3*sideLength, 1*sideLength, "10*10 - 64");
+	xyprintf(3*sideLength, 2*sideLength, "12*15 - 90");
+	xyprintf(3*sideLength, 3*sideLength, "15*20 - 148");*/
 	int difficulty = -1;
 	while(difficulty == -1)
 	{
 		while(mousemsg())
 		{
 			mouseMsg = getmouse();
-			if(mouseMsg.is_left() && mouseMsg.is_up())
+			if(mouseMsg.is_up())
 			{
-				difficulty = mouseMsg.y/sideLength;
-				break;
+				difficulty = mouseMsg.y/sideLength+1;
+			}
+		}
+		while(kbmsg())
+		{
+			keyMsg = getkey();
+			if(keyMsg.msg == key_msg_down)
+			{
+				if(keyMsg.key >= '0' && keyMsg.key <= '9')//选择难度
+				{
+					difficulty = keyMsg.key-'0'+0;
+				}
+				else if(keyMsg.key >= key_num0 && keyMsg.key <= key_num9)//小键盘识别
+				{
+					difficulty = keyMsg.key-key_num0+0;
+				}
+				else if(keyMsg.key == 'B') difficulty = 1;
+				else if(keyMsg.key == 'I') difficulty = 2;
+				else if(keyMsg.key == 'E') difficulty = 3;
+				else if(keyMsg.key == 'G') difficulty = 4;
+				else if(keyMsg.key == 'C') difficulty = 5;
 			}
 		}
 		delay_ms(RefreshCycle);
 	}
-	if(difficulty == 0)
+	if(difficulty == 1)
 	{
 		heightOfBoard = 6;
 		widthOfBoard = 6;
 		numberOfMine = 27;
 	}
-	else if(difficulty == 1)
+	else if(difficulty == 2)
 	{
 		heightOfBoard = 10;
 		widthOfBoard = 10;
 		numberOfMine = 64;
 	}
-	else if(difficulty == 2)
+	else if(difficulty == 3)
 	{
 		heightOfBoard = 12;
 		widthOfBoard = 15;
 		numberOfMine = 90;
 	}
-	else if(difficulty == 3)
+	else if(difficulty == 4)
 	{
 		heightOfBoard = 15;
 		widthOfBoard = 20;
 		numberOfMine = 148;
 	}
-	else if(difficulty == 4)
+	else
 	{
-		heightOfBoard = 24;
-		widthOfBoard = 24;
-		numberOfMine = 288;
-		char str[128];
-		resizewindow(13*sideLength, 10*sideLength);
+		char str[64];
+		resizewindow(13*32, 10*32);
 		inputbox_getline("自定义难度输入框",
 			"[行数] [列数] [雷数]\n注意空格，输入后回车。\n"
 			"最大地图24*24，某些难度可能难以生成可解地图。\n"
-			"什么？输入框太丑？请到https://github.com/wysaid/xege反馈！", str, 128);
+			"什么？输入框太丑？请到https://github.com/wysaid/xege反馈！", str, 64);
 		sscanf(str, "%d%d%d", &heightOfBoard, &widthOfBoard, &numberOfMine);
 		if(heightOfBoard < 1) heightOfBoard = 1;
 		if(heightOfBoard > LimHeight) heightOfBoard = LimHeight;
@@ -204,7 +235,12 @@ int main()
 							break;
 						}
 					}
-					if(keyMsg.key == '\t')
+					else if(keyMsg.key == 'R')
+					{
+						t0 = time(0);
+						SummonBoard(t0);
+					}
+					else if(keyMsg.key == '\t')
 					{
 						SolveStep();
 					}
@@ -226,10 +262,7 @@ int main()
 					}
 					for(c=c1; c<=c2; c++)
 					{
-						if(operation == '#' && isOpen[r1][c] == 2) continue;
-						if(operation == '%' && isOpen[r1][c] == 0) continue;
-						if(operation == '%') Operate('#', r1, c);
-						else Operate(operation, r1, c);
+						Operate(operation, r1, c);
 					}
 				}
 				else if(c1 == c2)
@@ -242,10 +275,7 @@ int main()
 					}
 					for(r=r1; r<=r2; r++)
 					{
-						if(operation == '#' && isOpen[r][c1] == 2) continue;
-						if(operation == '%' && isOpen[r][c1] == 0) continue;
-						if(operation == '%') Operate('#', r, c1);
-						else Operate(operation, r, c1);
+						Operate(operation, r, c1);
 					}
 				}
 			}
@@ -290,8 +320,8 @@ int main()
 			else DrawWindow(1, t1-t0, RED);
 			setfont(sideLength/2, 0, "黑体");
 			setcolor(RED);
-			xyprintf(sideLength/4, sideLength, "左键新游戏");
-			xyprintf(sideLength/4, sideLength*3/2, "右键关闭窗口");
+			xyprintf(sideLength/4, sideLength*2, "左键新游戏");
+			xyprintf(sideLength/4, sideLength*5/2, "右键关闭窗口");
 			setfont(sideLength, 0, "Consolas");
 			if(IsMousePosOutside())
 			{
@@ -307,7 +337,6 @@ int main()
 				{
 					if(mouseMsg.is_left()) newGame = 1;
 					else newGame = 0;
-					break;
 				}
 				if(mouseMsg.is_wheel() && keystate(key_control))//调整显示大小
 				{
@@ -317,6 +346,14 @@ int main()
 					setfont(sideLength, 0, "Consolas");
 					if(isEnd == 1) DrawWindow(1, t1-t0, YELLOW);
 					else DrawWindow(1, t1-t0, RED);
+				}
+			}
+			while(kbmsg())
+			{
+				keyMsg = getkey();
+				if(keyMsg.msg == key_msg_down)
+				{
+					if(keyMsg.key == 'R') newGame = 1;
 				}
 			}
 			delay_ms(RefreshCycle);
@@ -362,6 +399,49 @@ void DrawBlock(int r, int c, int isMine, int isOpen)
 			ege_ellipse(x+sideLength/4, y+sideLength/4, sideLength/2, sideLength/2);
 		}
 	}
+}
+
+void DrawLineA(int x0, int y0, int r, int angle)//绘制时钟指针
+{
+	float rad;
+	int x1, y1;
+	rad = angle*PI/180;
+	x1 = x0 + r*cos(rad);
+	y1 = y0 + r*sin(rad);
+	ege_line(x0, y0, x1, y1);
+}
+
+void DrawClock(int x0, int y0, int r)//绘制时钟
+{
+	int second, minute, hour;
+	int t = time(0);
+	// 获取时间
+	second = t%60;
+	minute = t/60;
+	hour = minute/60+8;
+	minute = minute%60;
+	hour = hour%24;
+	// 绘制时钟(r=20)
+	setfillcolor(WHITE);
+	ege_fillellipse(x0-r, y0-r, 2*r, 2*r);
+	setlinewidth(r/10);
+	setcolor(BLACK);
+	//circle(x0, y0, r);
+	ege_ellipse(x0-r, y0-r, 2*r, 2*r);
+	//秒针
+	setlinewidth(r/20);
+	setcolor(RED);
+	DrawLineA(x0, y0, r*4/5, 270+second*6);
+	setcolor(BLACK);
+	//分针
+	setlinewidth(r/20);
+	DrawLineA(x0, y0, r*3/4, 270+minute*6);
+	//时针
+	setlinewidth(r/10);
+	DrawLineA(x0, y0, r/2, 270+hour%12*30+minute/12*6);//每12分钟跳一格
+	//转轴
+	setfillcolor(RED);
+	ege_fillellipse(x0-r/10, y0-r/10, r/5, r/5);
 }
 
 void DrawWindow(int mode, int time, color_t timeColor)
@@ -443,9 +523,25 @@ void DrawWindow(int mode, int time, color_t timeColor)
 	{
 		line((lengthOfRowNumber+c)*sideLength, 0, (lengthOfRowNumber+c)*sideLength, (lengthOfColumnNumber+heightOfBoard)*sideLength);
 	}
+	//剩余雷数
+	int remainder = numberOfMine;
+	for(r=0; r<heightOfBoard; r++)
+	{
+		for(c=0; c<widthOfBoard; c++)
+		{
+			if(isOpen[r][c] == 2) remainder--;
+		}
+	}
+	setcolor(RED);
+	setlinewidth(sideLength/16);
+	ege_ellipse(sideLength/4, sideLength/4, sideLength/2, sideLength/2);
+	if(remainder == 0) setcolor(SPRINGGREEN);
+	else setcolor(WHITE);
+	xyprintf(sideLength, 0, "%d", remainder);
 	//用时
+	DrawClock(sideLength/2, sideLength*3/2, sideLength*10/32);
 	setcolor(timeColor);
-	xyprintf(sideLength/4, 0, "%ds", time);
+	xyprintf(sideLength, sideLength, "%ds", time);
 	//悬浮高亮
 	if(cursorR != InvalidPosition && cursorC != InvalidPosition)
 	{
@@ -512,7 +608,8 @@ void Operate(char operation, int r, int c)
 	if(r>=0 && r<heightOfBoard && c>=0 && c<widthOfBoard)
 	{
 		if(operation == '@' && isOpen[r][c] == 0) isOpen[r][c] = 1;
-		if(operation == '#' && isOpen[r][c] != 1) isOpen[r][c] = 2-isOpen[r][c];
+		if(operation == '#' && isOpen[r][c] == 0) isOpen[r][c] = 2;
+		if(operation == '%' && isOpen[r][c] == 2) isOpen[r][c] = 0;
 	}
 	else if(r>=0 && r<heightOfBoard && c < 0)//行数字
 	{
@@ -1511,4 +1608,14 @@ Easy Nonogram 0.3
 ——新增 鼠标悬浮高亮
 ——新增 自定义难度
 ——修复 终局后的Ctrl+滚轮异常改变时间
+Easy Nonogram 0.4
+——新增 剩余雷数显示
+——新增 按数字键或BIEGC选择难度
+——新增 按R重置地图
+——优化 自定义难度输入框边距
+——优化 独立分析取消标记操作
+——优化 设置难度鼠标在界外松开时为自定义难度
+——优化 鼠标任意键均可设置难度
+//——优化 动态内存分配
+//——优化 拖动操作提示线
 --------------------------------*/
