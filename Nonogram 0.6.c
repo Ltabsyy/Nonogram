@@ -26,7 +26,7 @@ int countOfLineNumber;
 int heightOfBoard = 6;
 int widthOfBoard = 6;
 int numberOfMine = 27;
-int summonCheckMode = 0;
+int summonCheckMode = 3;
 
 int lengthOfRowNumber = 3;
 int lengthOfColumnNumber = 3;
@@ -103,7 +103,7 @@ void SetConsoleMouseMode(int mode)//键鼠操作切换
 int main()
 {
 	int choiceMode;
-	int seed, r, c, isSigning;
+	int seed, r, c/*, isSigning*/;
 	int isEnd, temp, remainder, t0;
 	HANDLE hdin = GetStdHandle(STD_INPUT_HANDLE);
 	COORD mousePos = {0, 0};
@@ -344,7 +344,13 @@ int main()
 				if(widthOfBoard > LimWidth) widthOfBoard = LimWidth;
 				if(numberOfMine < 0) numberOfMine = 0;
 				if(numberOfMine > heightOfBoard * widthOfBoard) numberOfMine = heightOfBoard * widthOfBoard;
-				while(numberOfMine < (heightOfBoard+1)/2 || numberOfMine < (widthOfBoard+1)/2) numberOfMine++;
+				//while(numberOfMine < (heightOfBoard+1)/2 || numberOfMine < (widthOfBoard+1)/2) numberOfMine++;
+				if(summonCheckMode == 3 && numberOfMine < heightOfBoard * widthOfBoard / 2)
+				{
+					printf("密度过低，难以生成可解地图，是否维持地图可解？\n[1:维持可解/0放弃可解]>");
+					scanf("%d", &temp);
+					if(temp != 1) summonCheckMode = 0;
+				}
 			}
 			lengthOfRowNumber = (widthOfBoard+1)/2;
 			lengthOfColumnNumber = (heightOfBoard+1)/2;
@@ -1072,6 +1078,13 @@ int SolveLine(struct LinesIterator li)
 						}
 					}
 				}
+				if(check == 0 && nipos+lineNumber[ni] < lengthOfLine && lineOpen[nipos+lineNumber[ni]] == 2)
+				{
+					check = 3;//存在超尾标记
+					nstart = nipos+lineNumber[ni];
+					lineSolution[nipos] = 1;
+					nipos++;
+				}
 				if(check == 0) break;
 				/*标记连块数a = nend-nstart+1，边缘区长n-a
 				后部为nend+1(头)到(尾)nend+n-a = nstart+n-1
@@ -1216,7 +1229,6 @@ int SolveLine(struct LinesIterator li)
 		}
 		if(lineOpen[i] == 0)
 		{
-			//break;
 			if(lineNumber[ni] == 1)//次1判断
 			{
 				if(i > 0 && lineOpen[i-1] == 2)
@@ -1308,8 +1320,14 @@ int SolveLine(struct LinesIterator li)
 						}
 					}
 				}
+				if(check == 0 && nipos-lineNumber[ni] >= 0 && lineOpen[nipos-lineNumber[ni]] == 2)
+				{
+					check = 3;//存在超尾标记
+					nstart = nipos-lineNumber[ni];
+					lineSolution[nipos] = 1;
+					nipos--;
+				}
 				if(check == 0) break;
-				//break;
 				//计算标记连块尾位置和限制位置
 				nend = nipos-lineNumber[ni]+1;
 				for(i = nipos-lineNumber[ni]; i>=0; i--)
@@ -1435,7 +1453,7 @@ int SolveLine(struct LinesIterator li)
 	int* lastMine = LineLastSolutionMine();//生成末解雷场
 	if(firstMine != NULL && lastMine != NULL)
 	{
-		int matchFirstLast = 1;
+		/*int matchFirstLast = 1;
 		for(i=0; i<lengthOfLine; i++)
 		{
 			if(firstMine[i] != lastMine[i]) matchFirstLast = 0;
@@ -1448,13 +1466,20 @@ int SolveLine(struct LinesIterator li)
 				if(firstMine[i] == 0 && lineOpen[i] == 0) lineSolution[i] = 1;
 			}
 		}
-		else
+		else*/
 		{
 			//简单数字分析，可判断大数半满偏移
 			int n1pos = 0, n2pos = 0;
 			for(ni=0; ni<countOfLineNumber; ni++)
 			{
 				while(n1pos+lineNumber[ni] < lengthOfLine && firstMine[n1pos] == 0) n1pos++;
+				/*if(ni > 0 && n2pos < n1pos)//间分判断，末解前数尾和首解后数头之间翻开
+				{
+					for(i = n2pos; i < n1pos; i++)
+					{
+						if(lineOpen[i] == 0) lineSolution[i] = 1;
+					}
+				}*/
 				while(n2pos+lineNumber[ni] < lengthOfLine && lastMine[n2pos] == 0) n2pos++;
 				if(n1pos == n2pos)//数字确定
 				{
@@ -1711,7 +1736,13 @@ Nonogram 0.5
 Nonogram 0.6
 ——新增 端向心分析的非虚悬连1判断
 ——新增 大数预置分析后继续分析
+——新增 大数预置分析对超尾标记的处理
+——优化 现在默认校验地图可解
+——优化 不再自动提升过低雷数
+——优化 不再单独判断首末解完全相同的情况
 //——新增 拖动标记根据起始操作统一标记/取消标记
+//——新增 按空格执行标记校验改为翻开全部未标记方块
+//——新增 首末解交汇分析的间分判断
 //——修复 再次进入游戏时可能持续翻开方块
 //——修复 错误标记时引起的其他闪退
 --------------------------------*/
