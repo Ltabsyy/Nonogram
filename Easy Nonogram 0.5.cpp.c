@@ -44,6 +44,7 @@ void DrawBlock(int r, int c, int isMine, int isOpen);
 void DrawLineA(int x0, int y0, int r, int angle);
 void DrawClock(int x0, int y0, int r);
 void DrawWindow(int mode, int time, color_t timeColor);
+void DrawTipLine(int r1, int c1, int r2, int c2);
 void InitWindow(int mode);
 void Operate(char operation, int r, int c);
 int IsMousePosOutside();
@@ -180,13 +181,7 @@ int main()
 		{
 			t1 = time(0);
 			DrawWindow(0, t1-t0, WHITE);
-			if(r1 != InvalidPosition && c1 != InvalidPosition && (r1 == r2 || c1 == c2))
-			{
-				setcolor(BLUE);
-				setlinewidth(sideLength/16);
-				ege_line((lengthOfRowNumber+c1)*sideLength+sideLength/2, (lengthOfColumnNumber+r1)*sideLength+sideLength/2,
-					(lengthOfRowNumber+c2)*sideLength+sideLength/2, (lengthOfColumnNumber+r2)*sideLength+sideLength/2);
-			}
+			DrawTipLine(r1, c1, r2, c2);
 			operation = 0;
 			isEnd = 0;
 			if(IsMousePosOutside())
@@ -237,8 +232,11 @@ int main()
 					}
 					else if(keyMsg.key == 'R')
 					{
-						t0 = time(0);
-						SummonBoard(t0);
+						if(t0 != time(0))
+						{
+							t0 = time(0);
+							SummonBoard(t0);
+						}
 					}
 					else if(keyMsg.key == '\t')
 					{
@@ -250,7 +248,10 @@ int main()
 			{
 				if(operation == '#')//根据起点统一标记/取消标记
 				{
-					if(isOpen[r1][c1] == 2) operation = '%';
+					if(r1>=0 && r1<heightOfBoard && c1>=0 && c1<widthOfBoard)
+					{
+						if(isOpen[r1][c1] == 2) operation = '%';
+					}
 				}
 				if(r1 == r2)
 				{
@@ -557,6 +558,47 @@ void DrawWindow(int mode, int time, color_t timeColor)
 		if((cursorR >= 0 && cursorC < 0) || (cursorR < 0 && cursorC >= 0))//高亮方块
 		{
 			ege_fillrect((lengthOfRowNumber+cursorC)*sideLength, (lengthOfColumnNumber+cursorR)*sideLength, sideLength, sideLength);
+		}
+	}
+}
+
+void DrawTipLine(int r1, int c1, int r2, int c2)
+{
+	int r, c;
+	if(r1 != InvalidPosition && c1 != InvalidPosition && (r1 == r2 || c1 == c2))//拖动操作提示线
+	{
+		setcolor(BLUE);
+		setlinewidth(sideLength/16);
+		ege_line((lengthOfRowNumber+c1)*sideLength+sideLength/2, (lengthOfColumnNumber+r1)*sideLength+sideLength/2,
+			(lengthOfRowNumber+c2)*sideLength+sideLength/2, (lengthOfColumnNumber+r2)*sideLength+sideLength/2);
+		setfillcolor(BLUE);
+		if(r1 == r2)
+		{
+			if(c1 > c2)
+			{
+				c = c1;
+				c1 = c2;
+				c2 = c;
+			}
+			for(c=c1; c<=c2; c++)
+			{
+				ege_fillellipse((lengthOfRowNumber+c)*sideLength+sideLength*3/8,
+					(lengthOfColumnNumber+r1)*sideLength+sideLength*3/8, sideLength/4, sideLength/4);
+			}
+		}
+		else if(c1 == c2)
+		{
+			if(r1 > r2)
+			{
+				r = r1;
+				r1 = r2;
+				r2 = r;
+			}
+			for(r=r1; r<=r2; r++)
+			{
+				ege_fillellipse((lengthOfRowNumber+c1)*sideLength+sideLength*3/8,
+					(lengthOfColumnNumber+r)*sideLength+sideLength*3/8, sideLength/4, sideLength/4);
+			}
 		}
 	}
 }
@@ -1149,6 +1191,13 @@ int SolveLine(struct LinesIterator li)
 						}
 					}
 				}
+				if(check == 0 && nipos+lineNumber[ni] < lengthOfLine && lineOpen[nipos+lineNumber[ni]] == 2)
+				{
+					check = 3;//存在超尾标记
+					nstart = nipos+lineNumber[ni];
+					lineSolution[nipos] = 1;
+					nipos++;
+				}
 				if(check == 0) break;
 				/*标记连块数a = nend-nstart+1，边缘区长n-a
 				后部为nend+1(头)到(尾)nend+n-a = nstart+n-1
@@ -1266,7 +1315,6 @@ int SolveLine(struct LinesIterator li)
 		}
 		if(lineOpen[i] == 0)
 		{
-			//break;
 			if(lineNumber[ni] == 1)//次1判断
 			{
 				if(i > 0 && lineOpen[i-1] == 2)
@@ -1358,8 +1406,14 @@ int SolveLine(struct LinesIterator li)
 						}
 					}
 				}
+				if(check == 0 && nipos-lineNumber[ni] >= 0 && lineOpen[nipos-lineNumber[ni]] == 2)
+				{
+					check = 3;//存在超尾标记
+					nstart = nipos-lineNumber[ni];
+					lineSolution[nipos] = 1;
+					nipos--;
+				}
 				if(check == 0) break;
-				//break;
 				//计算标记连块尾位置和限制位置
 				nend = nipos-lineNumber[ni]+1;
 				for(i = nipos-lineNumber[ni]; i>=0; i--)
@@ -1458,7 +1512,7 @@ int SolveLine(struct LinesIterator li)
 	int* lastMine = LineLastSolutionMine();//生成末解雷场
 	if(firstMine != NULL && lastMine != NULL)
 	{
-		int matchFirstLast = 1;
+		/*int matchFirstLast = 1;
 		for(i=0; i<lengthOfLine; i++)
 		{
 			if(firstMine[i] != lastMine[i]) matchFirstLast = 0;
@@ -1471,13 +1525,20 @@ int SolveLine(struct LinesIterator li)
 				if(firstMine[i] == 0 && lineOpen[i] == 0) lineSolution[i] = 1;
 			}
 		}
-		else
+		else*/
 		{
 			//简单数字分析，可判断大数半满偏移
 			int n1pos = 0, n2pos = 0;
 			for(ni=0; ni<countOfLineNumber; ni++)
 			{
 				while(n1pos+lineNumber[ni] < lengthOfLine && firstMine[n1pos] == 0) n1pos++;
+				/*if(ni > 0 && n2pos < n1pos)//间分判断，末解前数尾和首解后数头之间翻开
+				{
+					for(i = n2pos; i < n1pos; i++)
+					{
+						if(lineOpen[i] == 0) lineSolution[i] = 1;
+					}
+				}*/
 				while(n2pos+lineNumber[ni] < lengthOfLine && lastMine[n2pos] == 0) n2pos++;
 				if(n1pos == n2pos)//数字确定
 				{
@@ -1616,6 +1677,9 @@ Easy Nonogram 0.4
 ——优化 独立分析取消标记操作
 ——优化 设置难度鼠标在界外松开时为自定义难度
 ——优化 鼠标任意键均可设置难度
+Easy Nonogram 0.5
+——新增 拖动操作提示线节点
+——优化 算法跟随Nonogram 0.6升级
+——修复 高难度长按R可能卡顿
 //——优化 动态内存分配
-//——优化 拖动操作提示线
 --------------------------------*/
