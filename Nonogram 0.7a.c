@@ -44,7 +44,7 @@ struct LinesIterator//标准线组迭代器
 struct LinesIterator LinesIteratorBegin();
 int IsLinesIteratorEnd(struct LinesIterator li);
 void LinesIteratorNext(struct LinesIterator* li);
-int PutNumber(int* mine, int pos, int number);
+//int PutNumber(int* mine, int pos, int number);
 int* LineFirstSolutionMine();
 int* LineLastSolutionMine();
 int SolveLine(struct LinesIterator li);
@@ -361,14 +361,14 @@ int main()
 			printf("[地图生成校验：0关闭/1必存在顶满边/2必存在空线/3地图可解]>");
 			scanf("%d", &summonCheckMode);
 		}
-		else if(choiceMode == 5)//标准万局测试
+		else if(choiceMode == 5)//标准十万局测试
 		{
 			int countWin = 0;
 			int count[2][3] = {0};
 			t0 = time(0);
 			temp = summonCheckMode;
 			summonCheckMode = 0;
-			for(seed=0; seed<10000; seed++)
+			for(seed=0; seed<100000; seed++)
 			{
 				/*printf("\nseed=%d\n", seed);
 				SummonBoard(seed);
@@ -379,7 +379,7 @@ int main()
 				}
 				PrintBoard(1);
 				*/
-				printf("\rseed=%d", seed);
+				if(seed % 64 == 0) printf("\rseed=%d", seed);//进度显示总耗时0.4秒
 				SummonBoard(seed);
 				countWin += Solve();
 				//PrintBoard(1);
@@ -391,6 +391,7 @@ int main()
 					}
 				}
 			}
+			printf("\rseed=%d", seed);
 			printf("\n胜利数：%d 用时：%d\n", countWin, time(0)-t0);
 			printf("正确翻开%d 正确标记%d 翻开雷%d 错误标记%d\n", count[0][1], count[1][2], count[1][1], count[0][2]);
 			summonCheckMode = temp;
@@ -867,7 +868,7 @@ void LinesIteratorNext(struct LinesIterator* li)
 		}
 	}
 }
-
+/*
 int PutNumber(int* mine, int pos, int number)//尝试放置数字，基于标准线信息
 {
 	int i;
@@ -887,25 +888,52 @@ int PutNumber(int* mine, int pos, int number)//尝试放置数字，基于标准
 	//if(pos + number < lengthOfLine) mine[i] = 0;
 	return 1;
 }
-
+*/
 int* LineFirstSolutionMine()//生成标准线首解雷场
 {
 	int* mine =(int*) calloc(lengthOfLine, sizeof(int));
-	int i, pos = 0;
+	int i, pos = 0, put, number, j;
 	for(i=0; i<countOfLineNumber; )
 	{
-		if(PutNumber(mine, pos, lineNumber[i]) == 1)
+		number = lineNumber[i];
+		//判断无法放置情况
+		if(pos + number > lengthOfLine//超出边界，pos + number-1 >= lengthOfLine
+		   || (pos + number < lengthOfLine && lineOpen[pos+number] == 2)//尾部为标记
+		   || (pos > 0 && lineOpen[pos-1] == 2))//头部为标记
 		{
-			pos += lineNumber[i]+1;
-			i++;
-		}
-		else
-		{
-			pos++;
-			if(pos + lineNumber[i] > lengthOfLine)//无解情况
+			pos++;//单步跳过该位置
+			if(pos + number > lengthOfLine)//无解情况
 			{
 				free(mine);
 				return NULL;
+			}
+		}
+		else
+		{
+			put = 1;
+			for(j=pos+number-1; j>=pos; j--)//逆序检查
+			{
+				if(lineOpen[j] == 1)//中部被翻开
+				{
+					put = 0;
+					pos = j+1;//多步连跳到翻开位置
+					if(pos + number > lengthOfLine)//无解情况
+					{
+						free(mine);
+						return NULL;
+					}
+					break;
+				}
+			}
+			if(put == 1)
+			{
+				//放置
+				for(j=pos; j<pos+number; j++)
+				{
+					mine[j] = 1;
+				}
+				pos += number+1;
+				i++;
 			}
 		}
 	}
@@ -915,21 +943,47 @@ int* LineFirstSolutionMine()//生成标准线首解雷场
 int* LineLastSolutionMine()//生成标准线末解雷场
 {
 	int* mine =(int*) calloc(lengthOfLine, sizeof(int));
-	int i, pos = lengthOfLine-1;
+	int i, pos = lengthOfLine-1, put, number, j;
 	for(i=countOfLineNumber-1; i>=0; )
 	{
-		if(PutNumber(mine, pos, lineNumber[i]) == 1)
+		number = lineNumber[i];
+		//判断无法放置情况
+		if(pos - number + 1 < 0//超出边界
+		   || (pos - number >= 0 && lineOpen[pos-number] == 2)//尾部为标记
+		   || (pos+1 < lengthOfLine && lineOpen[pos+1] == 2))//头部为标记
 		{
-			if(i > 0) pos -= lineNumber[i-1]+1;
-			i--;
-		}
-		else
-		{
-			pos--;
+			pos--;//单步跳过该位置
 			if(pos < 0)//无解情况
 			{
 				free(mine);
 				return NULL;
+			}
+		}
+		else
+		{
+			put = 1;
+			for(j=pos-number+1; j<=pos; j++)//逆序检查
+			{
+				if(lineOpen[j] == 1)//中部被翻开
+				{
+					put = 0;
+					pos = j-1;//多步连跳到翻开位置
+					if(pos < 0)//无解情况
+					{
+						free(mine);
+						return NULL;
+					}
+				}
+			}
+			if(put == 1)
+			{
+				//放置
+				for(j=pos; j>pos-number; j--)
+				{
+					mine[j] = 1;
+				}
+				pos -= number+1;
+				i--;
 			}
 		}
 	}
@@ -1042,7 +1096,7 @@ int SolveLine(struct LinesIterator li)
 								}
 							}
 						}
-					}//需要i回溯或处理衔接，复杂且效益不高
+					}
 					break;
 				}
 			}
@@ -1453,22 +1507,8 @@ int SolveLine(struct LinesIterator li)
 	int* lastMine = LineLastSolutionMine();//生成末解雷场
 	if(firstMine != NULL && lastMine != NULL)
 	{
-		/*int matchFirstLast = 1;
-		for(i=0; i<lengthOfLine; i++)
 		{
-			if(firstMine[i] != lastMine[i]) matchFirstLast = 0;
-		}
-		if(matchFirstLast == 1)//首解末解完全相同，可判断端收束顶满线
-		{
-			for(i=0; i<lengthOfLine; i++)
-			{
-				if(firstMine[i] == 1 && lineOpen[i] == 0) lineSolution[i] = 2;
-				if(firstMine[i] == 0 && lineOpen[i] == 0) lineSolution[i] = 1;
-			}
-		}
-		else*/
-		{
-			//简单数字分析，可判断大数半满偏移
+			//简单数字分析，可判断端收束顶满线、大数半满偏移
 			int n1pos = 0, n2pos = 0;
 			for(ni=0; ni<countOfLineNumber; ni++)
 			{
@@ -1740,6 +1780,9 @@ Nonogram 0.6
 ——优化 现在默认校验地图可解
 ——优化 不再自动提升过低雷数
 ——优化 不再单独判断首末解完全相同的情况
+Nonogram 0.7
+——优化 标准万局测试改为标准十万局测试
+——优化 重构首末解生成
 //——新增 拖动标记根据起始操作统一标记/取消标记
 //——新增 按空格执行标记校验改为翻开全部未标记方块
 //——新增 首末解交汇分析的间分判断
