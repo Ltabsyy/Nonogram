@@ -32,10 +32,12 @@ int lengthOfRowNumber = 3;
 int lengthOfColumnNumber = 3;
 
 int debug = 0;
+int countStep = 0;
 
 void PrintBoard(int mode);
 void SummonBoard(int seed);
 int CheckSign();
+//int LiS();
 void RecoverLine(int r, int c, int mode);
 struct LinesIterator//标准线组迭代器
 {
@@ -104,7 +106,7 @@ int main()
 {
 	int choiceMode;
 	int seed, r, c/*, isSigning*/;
-	int isEnd, temp, remainder, t0;
+	int isEnd, temp, remainder, t0/*, lis*/;
 	HANDLE hdin = GetStdHandle(STD_INPUT_HANDLE);
 	COORD mousePos = {0, 0};
 	COORD mouseOperatedPos = {0, 0};//鼠标已操作坐标，屏蔽双击
@@ -129,6 +131,7 @@ int main()
 			t0 = time(0);
 			remainder = numberOfMine;
 			SummonBoard(t0);
+			//lis = LiS();
 			SetConsoleMouseMode(1);
 			//FlushConsoleInputBuffer(hdin);
 			showCursor(0);
@@ -142,6 +145,7 @@ int main()
 				{
 					gotoxy(0, (heightOfBoard+1)/2+heightOfBoard);
 					printf("剩余雷数：%d 用时：%d \n", remainder, time(0)-t0);
+					//printf("剩余雷数：%d 用时：%d LiS：%d/%d \n", remainder, time(0)-t0, lis-LiS(), lis);
 					GetNumberOfConsoleInputEvents(hdin, &rcdnum);
 					if(rcdnum == 0)
 					{
@@ -265,13 +269,19 @@ int main()
 					showCursor(0);
 					Sleep(RefreshCycle);
 				}
-				if(r>=0 && r<heightOfBoard && c>=0 && c<widthOfBoard
-					&& isMine[r][c] == 1 && isOpen[r][c] == 1)
-				{
-					break;//翻开雷失败
-				}
 				if(isEnd == 1) break;//标记校验成功
-				isEnd = 1;//翻开所有非雷方块成功
+				isEnd = 1;
+				for(r=0; r<heightOfBoard; r++)
+				{
+					for(c=0; c<widthOfBoard; c++)
+					{
+						if(isMine[r][c] == 1 && isOpen[r][c] == 1)
+						{
+							isEnd = 0;
+						}
+					}
+				}
+				if(isEnd == 0) break;//翻开雷失败
 				for(r=0; r<heightOfBoard; r++)
 				{
 					for(c=0; c<widthOfBoard; c++)
@@ -282,7 +292,7 @@ int main()
 						}
 					}
 				}
-				if(isEnd == 1) break;
+				if(isEnd == 1) break;//翻开所有非雷方块成功
 			}
 			clrscr();
 			gotoxy(0, 0);
@@ -365,6 +375,7 @@ int main()
 		{
 			int countWin = 0;
 			int count[2][3] = {0};
+			countStep = 0;
 			t0 = time(0);
 			temp = summonCheckMode;
 			summonCheckMode = 0;
@@ -392,7 +403,7 @@ int main()
 				}
 			}
 			printf("\rseed=%d", seed);
-			printf("\n胜利数：%d 用时：%d\n", countWin, time(0)-t0);
+			printf("\n胜利数：%d 用时：%d 步数：%d\n", countWin, time(0)-t0, countStep);
 			printf("正确翻开%d 正确标记%d 翻开雷%d 错误标记%d\n", count[0][1], count[1][2], count[1][1], count[0][2]);
 			summonCheckMode = temp;
 		}
@@ -745,7 +756,42 @@ int CheckSign()
 	}
 	return 1;//胜利
 }
-
+/*
+int LiS()//计算剩余空含线数，衡量地图难度和游戏进度
+{
+	int r, c;
+	int lis = 0;
+	int** space =(int**) calloc(heightOfBoard, sizeof(int*));
+	for(r=0; r<heightOfBoard; r++)
+	{
+		space[r] =(int*) calloc(widthOfBoard, sizeof(int));
+		for(c=0; c<widthOfBoard; c++)
+		{
+			if(isMine[r][c] == 0 && isOpen[r][c] != 1)
+			{
+				space[r][c] = 1;
+			}
+		}
+	}
+	for(r=0; r<heightOfBoard; r++)
+	{
+		for(c=0; c<widthOfBoard; c++)
+		{
+			if(space[r][c] == 1)
+			{
+				lis++;
+				//if(r-1 < 0 || space[r-1][c] == 0)
+			}
+		}
+	}
+	for(r=0; r<heightOfBoard; r++)
+	{
+		free(space[r]);
+	}
+	free(space);
+	return lis;
+}
+*/
 void RecoverLine(int r, int c, int mode)//0生成line，1写出
 {
 	int i, i0;
@@ -992,7 +1038,7 @@ int* LineLastSolutionMine()//生成标准线末解雷场
 
 int SolveLine(struct LinesIterator li)
 {
-	int i, ni;
+	int i, ni, nipos, check;
 	//生成标准线
 	RecoverLine(li.r, li.c, 0);
 	if(debug)
@@ -1026,7 +1072,7 @@ int SolveLine(struct LinesIterator li)
 		printf("\n");
 	}
 	//端向心分析
-	int nipos, check, nstart, nend, nlimit;
+	int nstart, nend, nlimit;
 	//头向尾分析
 	ni = 0;
 	for(i=0; i<lengthOfLine; i++)
@@ -1061,7 +1107,7 @@ int SolveLine(struct LinesIterator li)
 					}
 					if(nj == countOfLineNumber)//全1判断
 					{
-						for(; i<lengthOfLine; i++)
+						for(i+=2; i<lengthOfLine; i++)
 						{
 							if(lineOpen[i] == 2)//前后翻开
 							{
@@ -1079,20 +1125,20 @@ int SolveLine(struct LinesIterator li)
 							{
 								if(lineOpen[i-1] == 0) lineSolution[i-1] = 1;
 								if(i+1 < lengthOfLine && lineOpen[i+1] == 0) lineSolution[i+1] = 1;
-								i+=2;
+								i += 2;
 							}
 							else if(lineOpen[i] == 0)
 							{
 								if(lineOpen[i+1] != 2)//连续两个未知方块或单个未知方块和翻开
 								{
-									i+=2;
+									i += 2;
 								}
 								else//未知方块尾随标记
 								{
 									i++;//定位到标记
 									if(lineOpen[i-1] == 0) lineSolution[i-1] = 1;
 									if(i+1 < lengthOfLine && lineOpen[i+1] == 0) lineSolution[i+1] = 1;
-									i+=2;
+									i += 2;
 								}
 							}
 						}
@@ -1247,20 +1293,20 @@ int SolveLine(struct LinesIterator li)
 					{
 						if(lineOpen[i-1] == 0) lineSolution[i-1] = 1;
 						if(i+1 < lengthOfLine && lineOpen[i+1] == 0) lineSolution[i+1] = 1;
-						i+=2;
+						i += 2;
 					}
 					else if(lineOpen[i] == 0)
 					{
 						if(lineOpen[i+1] != 2)//连续两个未知方块或单个未知方块和翻开
 						{
-							i+=2;
+							i += 2;
 						}
 						else//未知方块尾随标记
 						{
 							i++;//定位到标记
 							if(lineOpen[i-1] == 0) lineSolution[i-1] = 1;
 							if(i+1 < lengthOfLine && lineOpen[i+1] == 0) lineSolution[i+1] = 1;
-							i+=2;
+							i += 2;
 						}
 					}
 				}
@@ -1303,7 +1349,7 @@ int SolveLine(struct LinesIterator li)
 					}
 					if(nj == -1)//全1判断
 					{
-						for(; i>=0; i--)
+						for(i-=2; i>=0; i--)
 						{
 							if(lineOpen[i] == 2)//前后翻开
 							{
@@ -1321,20 +1367,20 @@ int SolveLine(struct LinesIterator li)
 							{
 								if(i > 0 && lineOpen[i-1] == 0) lineSolution[i-1] = 1;
 								if(lineOpen[i+1] == 0) lineSolution[i+1] = 1;
-								i-=2;
+								i -= 2;
 							}
 							else if(lineOpen[i] == 0)
 							{
 								if(lineOpen[i-1] != 2)//连续两个未知方块或单个未知方块和翻开
 								{
-									i-=2;
+									i -= 2;
 								}
 								else//未知方块尾随标记
 								{
 									i--;//定位到标记
 									if(i > 0 && lineOpen[i-1] == 0) lineSolution[i-1] = 1;
 									if(lineOpen[i+1] == 0) lineSolution[i+1] = 1;
-									i-=2;
+									i -= 2;
 								}
 							}
 						}
@@ -1482,20 +1528,20 @@ int SolveLine(struct LinesIterator li)
 					{
 						if(i > 0 && lineOpen[i-1] == 0) lineSolution[i-1] = 1;
 						if(lineOpen[i+1] == 0) lineSolution[i+1] = 1;
-						i-=2;
+						i -= 2;
 					}
 					else if(lineOpen[i] == 0)
 					{
 						if(lineOpen[i-1] != 2)//连续两个未知方块或单个未知方块和翻开
 						{
-							i-=2;
+							i -= 2;
 						}
 						else//未知方块尾随标记
 						{
 							i--;//定位到标记
 							if(i > 0 && lineOpen[i-1] == 0) lineSolution[i-1] = 1;
 							if(lineOpen[i+1] == 0) lineSolution[i+1] = 1;
-							i-=2;
+							i -= 2;
 						}
 					}
 				}
@@ -1507,60 +1553,59 @@ int SolveLine(struct LinesIterator li)
 	int* lastMine = LineLastSolutionMine();//生成末解雷场
 	if(firstMine != NULL && lastMine != NULL)
 	{
+		//简单数字分析，可判断端收束顶满线、大数半满偏移
+		int n1pos = 0, n2pos = 0;
+		/*if(countOfLineNumber > 0)//线首翻开
 		{
-			//简单数字分析，可判断端收束顶满线、大数半满偏移
-			int n1pos = 0, n2pos = 0;
-			for(ni=0; ni<countOfLineNumber; ni++)
+			while(n1pos+lineNumber[0] < lengthOfLine && firstMine[n1pos] == 0)
 			{
-				while(n1pos+lineNumber[ni] < lengthOfLine && firstMine[n1pos] == 0) n1pos++;
-				/*if(ni > 0 && n2pos < n1pos)//间分判断，末解前数尾和首解后数头之间翻开
-				{
-					for(i = n2pos; i < n1pos; i++)
-					{
-						if(lineOpen[i] == 0) lineSolution[i] = 1;
-					}
-				}*/
-				while(n2pos+lineNumber[ni] < lengthOfLine && lastMine[n2pos] == 0) n2pos++;
-				if(n1pos == n2pos)//数字确定
-				{
-					if(n1pos > 0 && lineOpen[n1pos-1] == 0)//头部翻开
-					{
-						lineSolution[n1pos-1] = 1;
-					}
-					for(i=n1pos; i < n1pos+lineNumber[ni]; i++)//中部标记
-					{
-						if(lineOpen[i] == 0) lineSolution[i] = 2;
-					}
-					if(n1pos+lineNumber[ni] < lengthOfLine && lineOpen[n1pos+lineNumber[ni]] == 0)//尾部翻开
-					{
-						lineSolution[n1pos+lineNumber[ni]] = 1;
-					}
-				}
-				else if(n2pos - n1pos < lineNumber[ni])//数字中部确定
-				{
-					for(i=n2pos; i < n1pos+lineNumber[ni]; i++)//中部标记
-					{
-						if(lineOpen[i] == 0) lineSolution[i] = 2;
-					}
-				}
-				if(ni == 0 && n1pos > 0)//线首翻开
-				{
-					for(i=0; i<n1pos; i++)
-					{
-						if(lineOpen[i] == 0) lineSolution[i] = 1;
-					}
-				}
-				if(ni == countOfLineNumber-1 && n2pos+lineNumber[ni] < lengthOfLine)//线尾翻开
-				{
-					for(i=n2pos+lineNumber[ni]; i<lengthOfLine; i++)
-					{
-						if(lineOpen[i] == 0) lineSolution[i] = 1;
-					}
-				}
-				n1pos += lineNumber[ni];
-				n2pos += lineNumber[ni];
+				if(lineOpen[n1pos] == 0) lineSolution[n1pos] = 1;
+				n1pos++;
 			}
+		}*/
+		for(ni=0; ni<countOfLineNumber; ni++)
+		{
+			while(n1pos+lineNumber[ni] < lengthOfLine && firstMine[n1pos] == 0) n1pos++;
+			/*if(ni > 0 && n2pos < n1pos)//间分判断，末解前数尾和首解后数头之间翻开
+			{
+				for(i = n2pos; i < n1pos; i++)
+				{
+					if(lineOpen[i] == 0) lineSolution[i] = 1;
+				}
+			}*/
+			while(n2pos+lineNumber[ni] < lengthOfLine && lastMine[n2pos] == 0) n2pos++;
+			if(n1pos == n2pos)//数字确定
+			{
+				if(n1pos > 0 && lineOpen[n1pos-1] == 0)//头部翻开
+				{
+					lineSolution[n1pos-1] = 1;
+				}
+				for(i=n1pos; i < n1pos+lineNumber[ni]; i++)//中部标记
+				{
+					if(lineOpen[i] == 0) lineSolution[i] = 2;
+				}
+				if(n1pos+lineNumber[ni] < lengthOfLine && lineOpen[n1pos+lineNumber[ni]] == 0)//尾部翻开
+				{
+					lineSolution[n1pos+lineNumber[ni]] = 1;
+				}
+			}
+			else if(n2pos - n1pos < lineNumber[ni])//数字中部确定
+			{
+				for(i=n2pos; i < n1pos+lineNumber[ni]; i++)//中部标记
+				{
+					if(lineOpen[i] == 0) lineSolution[i] = 2;
+				}
+			}
+			n1pos += lineNumber[ni];
+			n2pos += lineNumber[ni];
 		}
+		/*if(n2pos < lengthOfLine)//线尾翻开
+		{
+			for(i=n2pos; i<lengthOfLine; i++)
+			{
+				if(lineOpen[i] == 0) lineSolution[i] = 1;
+			}
+		}*/
 	}
 	else//存在错误标记
 	{
@@ -1568,17 +1613,29 @@ int SolveLine(struct LinesIterator li)
 		if(lastMine != NULL) free(lastMine);
 		return 0;
 	}
-	//完成分析//中级测试种子7
-	int sum1 = 0, sum2 = 0;
-	for(i=0; i<lengthOfLine; i++)
+	//完成分析，判断首末解不完全相同的完成情况
+	check = 1;
+	nipos = 0;
+	for(ni=0; ni<countOfLineNumber; ni++)
 	{
-		if(lineOpen[i] == 2) sum1++;
+		while(nipos < lengthOfLine && (lineOpen[nipos] != 2 && lineSolution[nipos] != 2)) nipos++;
+		if(nipos+lineNumber[ni]-1 >= lengthOfLine)
+		{
+			check = 0;
+			break;
+		}
+		for(i = nipos; i < nipos+lineNumber[ni]; i++)
+		{
+			if(lineOpen[i] != 2 && lineSolution[i] != 2)
+			{
+				check = 0;
+				break;
+			}
+		}
+		if(check == 0) break;
+		nipos += lineNumber[ni];
 	}
-	for(i=0; i<countOfLineNumber; i++)
-	{
-		sum2 += lineNumber[i];
-	}
-	if(sum1 == sum2)
+	if(check == 1)
 	{
 		for(i=0; i<lengthOfLine; i++)
 		{
@@ -1716,6 +1773,7 @@ int SolveStep()
 			isSolving += AirWeaveLine(li);
 		}
 	}*/
+	countStep++;
 	return isSolving != 0;
 }
 
@@ -1781,11 +1839,16 @@ Nonogram 0.6
 ——优化 不再自动提升过低雷数
 ——优化 不再单独判断首末解完全相同的情况
 Nonogram 0.7
+——新增 标准测试统计步数
 ——优化 标准万局测试改为标准十万局测试
 ——优化 重构首末解生成
+——优化 首末解交汇分析不再翻开线首和线尾
+——优化 重构完成分析
+——修复 错误标记Tab后不失败
 //——新增 拖动标记根据起始操作统一标记/取消标记
 //——新增 按空格执行标记校验改为翻开全部未标记方块
 //——新增 首末解交汇分析的间分判断
+//——优化 动态内存分配
 //——修复 再次进入游戏时可能持续翻开方块
 //——修复 错误标记时引起的其他闪退
 --------------------------------*/
