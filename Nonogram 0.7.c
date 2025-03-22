@@ -37,7 +37,7 @@ int countStep = 0;
 void PrintBoard(int mode);
 void SummonBoard(int seed);
 int CheckSign();
-//int LiS();
+int LiS();
 void RecoverLine(int r, int c, int mode);
 struct LinesIterator//标准线组迭代器
 {
@@ -106,7 +106,7 @@ int main()
 {
 	int choiceMode;
 	int seed, r, c/*, isSigning*/;
-	int isEnd, temp, remainder, t0/*, lis*/;
+	int isEnd, temp, remainder, t0, t1, lis;
 	HANDLE hdin = GetStdHandle(STD_INPUT_HANDLE);
 	COORD mousePos = {0, 0};
 	COORD mouseOperatedPos = {0, 0};//鼠标已操作坐标，屏蔽双击
@@ -131,7 +131,8 @@ int main()
 			t0 = time(0);
 			remainder = numberOfMine;
 			SummonBoard(t0);
-			//lis = LiS();
+			lis = LiS();
+			temp = lis;
 			SetConsoleMouseMode(1);
 			//FlushConsoleInputBuffer(hdin);
 			showCursor(0);
@@ -144,8 +145,8 @@ int main()
 				while(1)
 				{
 					gotoxy(0, (heightOfBoard+1)/2+heightOfBoard);
-					printf("剩余雷数：%d 用时：%d \n", remainder, time(0)-t0);
-					//printf("剩余雷数：%d 用时：%d LiS：%d/%d \n", remainder, time(0)-t0, lis-LiS(), lis);
+					t1 = time(0);
+					printf("剩余雷数：%d 用时：%d LiS：%d/%d \n", remainder, t1-t0, lis-temp, lis);
 					GetNumberOfConsoleInputEvents(hdin, &rcdnum);
 					if(rcdnum == 0)
 					{
@@ -165,6 +166,7 @@ int main()
 							if(rcd.Event.MouseEvent.dwButtonState == FROM_LEFT_1ST_BUTTON_PRESSED)
 							{
 								if(isOpen[r][c] == 0) isOpen[r][c] = 1;
+								temp = LiS();
 								break;
 							}
 							else if(rcd.Event.MouseEvent.dwButtonState == RIGHTMOST_BUTTON_PRESSED)
@@ -258,6 +260,7 @@ int main()
 						else if(rcd.Event.KeyEvent.wVirtualKeyCode == '\t')
 						{
 							SolveStep();
+							temp = LiS();
 							break;
 						}
 					}
@@ -297,9 +300,18 @@ int main()
 			clrscr();
 			gotoxy(0, 0);
 			PrintBoard(1);
-			if(isEnd == 1) printf(":)\nYou Win!\n");
-			else printf(":(\nGame Over!\n");
-			printf("用时：%d\n", time(0)-t0);
+			t1 = time(0);
+			if(isEnd == 1)
+			{
+				printf(":)\nYou Win!\n");
+				printf("用时：%d LiS：%d 速度：%.2f\n", t1-t0, lis, 10.0*lis/(t1-t0));
+			}
+			else
+			{
+				printf(":(\nGame Over!\n");
+				temp = LiS();
+				printf("用时：%d LiS：%d/%d 速度：%.2f\n", t1-t0, lis-LiS(), lis, 10.0*(lis-LiS())/(t1-t0));
+			}
 			SetConsoleMouseMode(0);
 			showCursor(1);
 			fflush(stdin);
@@ -406,6 +418,21 @@ int main()
 			printf("\n胜利数：%d 用时：%d 步数：%d\n", countWin, time(0)-t0, countStep);
 			printf("正确翻开%d 正确标记%d 翻开雷%d 错误标记%d\n", count[0][1], count[1][2], count[1][1], count[0][2]);
 			summonCheckMode = temp;
+		}
+		else if(choiceMode == 6)//测试LiS
+		{
+			temp = summonCheckMode;
+			summonCheckMode = 0;
+			debug = 1;
+			for(seed=0; seed<10; seed++)
+			{
+				SummonBoard(seed);
+				printf("seed=%d\n", seed);
+				//PrintBoard(1);
+				LiS();
+			}
+			summonCheckMode = temp;
+			debug = 0;
 		}
 		else// if(choiceMode == 3)
 		{
@@ -756,15 +783,24 @@ int CheckSign()
 	}
 	return 1;//胜利
 }
-/*
+
 int LiS()//计算剩余空含线数，衡量地图难度和游戏进度
 {
-	int r, c;
-	int lis = 0;
+	int r, c, r1, c1, r2, c2, isRising;
+	int lis = 0, hlis, vlis;
 	int** space =(int**) calloc(heightOfBoard, sizeof(int*));
+	int** link =(int**) calloc(heightOfBoard, sizeof(int*));
+	int** chain = (int**) calloc(heightOfBoard, sizeof(int*));
+	//申请内存
 	for(r=0; r<heightOfBoard; r++)
 	{
 		space[r] =(int*) calloc(widthOfBoard, sizeof(int));
+		link[r] =(int*) calloc(widthOfBoard, sizeof(int));
+		chain[r] =(int*) calloc(widthOfBoard, sizeof(int));
+	}
+	//标记未翻开空格
+	for(r=0; r<heightOfBoard; r++)
+	{
 		for(c=0; c<widthOfBoard; c++)
 		{
 			if(isMine[r][c] == 0 && isOpen[r][c] != 1)
@@ -773,25 +809,234 @@ int LiS()//计算剩余空含线数，衡量地图难度和游戏进度
 			}
 		}
 	}
+	//计算空格连通性
 	for(r=0; r<heightOfBoard; r++)
 	{
 		for(c=0; c<widthOfBoard; c++)
 		{
-			if(space[r][c] == 1)
+			if(space[r][c] == 1)//8421标记上右下左是否为空格
 			{
-				lis++;
-				//if(r-1 < 0 || space[r-1][c] == 0)
+				if(r > 0 && space[r-1][c] == 1) link[r][c] |= 8;
+				if(c+1 < widthOfBoard && space[r][c+1] == 1) link[r][c] |= 4;
+				if(r+1 < heightOfBoard && space[r+1][c] == 1) link[r][c] |= 2;
+				if(c > 0 && space[r][c-1] == 1) link[r][c] |= 1;
 			}
+		}
+	}
+	//必然计算
+	for(r1=0; r1<heightOfBoard; r1++)
+	{
+		for(c1=0; c1<widthOfBoard; c1++)
+		{
+			if(space[r1][c1] == 1)
+			{
+				r = r1;
+				c = c1;
+				//处理无连空格
+				if(link[r1][c1] == 0)
+				{
+					lis++;
+					space[r][c] = 2;
+				}
+				//处理单连空格
+				else if(link[r1][c1] == 8)
+				{
+					lis++;
+					for(; r>=0 && space[r][c]; r--)
+					{
+						space[r][c] = 2;
+					}
+				}
+				else if(link[r1][c1] == 4)
+				{
+					lis++;
+					for(; c<widthOfBoard && space[r][c]; c++)
+					{
+						space[r][c] = 2;
+					}
+				}
+				else if(link[r1][c1] == 2)
+				{
+					lis++;
+					for(; r<heightOfBoard && space[r][c]; r++)
+					{
+						space[r][c] = 2;
+					}
+				}
+				else if(link[r1][c1] == 1)
+				{
+					lis++;
+					for(; c>=0 && space[r][c]; c--)
+					{
+						space[r][c] = 2;
+					}
+				}
+				//处理双连空格
+				if(link[r1][c1] == 10)
+				{
+					lis++;
+					for(; r>=0 && space[r][c]; r--)
+					{
+						space[r][c] = 2;
+					}
+					for(r=r1+1; r<heightOfBoard && space[r][c]; r++)
+					{
+						space[r][c] = 2;
+					}
+				}
+				else if(link[r1][c1] == 5)
+				{
+					lis++;
+					for(; c<widthOfBoard && space[r][c]; c++)
+					{
+						space[r][c] = 2;
+					}
+					for(c=c1-1; c>=0 && space[r][c]; c--)
+					{
+						space[r][c] = 2;
+					}
+				}
+			}
+		}
+	}
+	//策略计算
+	for(r1=0; r1<heightOfBoard; r1++)
+	{
+		for(c1=0; c1<widthOfBoard; c1++)
+		{
+			if(space[r1][c1] == 1)
+			{
+				//生成空链
+				for(r=0; r<heightOfBoard; r++)
+				{
+					for(c=0; c<widthOfBoard; c++)
+					{
+						chain[r][c] = 0;
+					}
+				}
+				chain[r1][c1] = 1;
+				isRising = 1;
+				while(isRising == 1)
+				{
+					isRising = 0;
+					for(r2=0; r2<heightOfBoard; r2++)
+					{
+						for(c2=0; c2<widthOfBoard; c2++)
+						{
+							if(space[r2][c2] == 1 && chain[r2][c2] == 1)
+							{
+								r = r2;
+								c = c2;
+								for(; r>=0 && space[r][c]; r--)//向上
+								{
+									if(chain[r][c] == 0)
+									{
+										chain[r][c] = 1;
+										isRising = 1;
+									}
+								}
+								for(r=r2+1; r<heightOfBoard && space[r][c]; r++)//向下
+								{
+									if(chain[r][c] == 0)
+									{
+										chain[r][c] = 1;
+										isRising = 1;
+									}
+								}
+								for(r=r2; c<widthOfBoard && space[r][c]; c++)//向右
+								{
+									if(chain[r][c] == 0)
+									{
+										chain[r][c] = 1;
+										isRising = 1;
+									}
+								}
+								for(c=c1-1; c>=0 && space[r][c]; c--)//向左
+								{
+									if(chain[r][c] == 0)
+									{
+										chain[r][c] = 1;
+										isRising = 1;
+									}
+								}
+							}
+						}
+					}
+				}
+				//计算横向线数
+				hlis = 0;
+				for(r=0; r<heightOfBoard; r++)
+				{
+					for(c=0; c<widthOfBoard; c++)
+					{
+						if(chain[r][c] == 1 && space[r][c] == 1)
+						{
+							hlis++;
+							for(; c<widthOfBoard && chain[r][c]; c++);
+						}
+					}
+				}
+				//计算纵向线数
+				vlis = 0;
+				for(c=0; c<widthOfBoard; c++)
+				{
+					for(r=0; r<heightOfBoard; r++)
+					{
+						if(chain[r][c] == 1 && space[r][c] == 1)
+						{
+							vlis++;
+							for(; r<heightOfBoard && chain[r][c]; r++);
+						}
+					}
+				}
+				//增加较小值
+				if(hlis <= vlis) lis += hlis;
+				else lis += vlis;
+				//处理空格
+				for(r=0; r<heightOfBoard; r++)
+				{
+					for(c=0; c<widthOfBoard; c++)
+					{
+						if(chain[r][c] == 1 && space[r][c] == 1)
+						{
+							space[r][c] = 2;
+						}
+					}
+				}
+			}
+		}
+	}
+	//调试
+	if(debug)
+	{
+		printf("LiS = %d\n", lis);
+		for(r=0; r<heightOfBoard; r++)
+		{
+			for(c=0; c<widthOfBoard; c++)
+			{
+				if(space[r][c] == 0) printf("  ");
+				else
+				{
+					putchar(' ');
+					if(space[r][c] == 1) ColorNumber(1, 0x04);
+					else if(space[r][c] == 2) ColorNumber(2, 0x02);
+				}
+			}
+			printf("\n");
 		}
 	}
 	for(r=0; r<heightOfBoard; r++)
 	{
 		free(space[r]);
+		free(link[r]);
+		free(chain[r]);
 	}
 	free(space);
+	free(link);
+	free(chain);
 	return lis;
 }
-*/
+
 void RecoverLine(int r, int c, int mode)//0生成line，1写出
 {
 	int i, i0;
@@ -1840,6 +2085,7 @@ Nonogram 0.6
 ——优化 不再单独判断首末解完全相同的情况
 Nonogram 0.7
 ——新增 标准测试统计步数
+——新增 显示LiS和速度
 ——优化 标准万局测试改为标准十万局测试
 ——优化 重构首末解生成
 ——优化 首末解交汇分析不再翻开线首和线尾
@@ -1850,5 +2096,4 @@ Nonogram 0.7
 //——新增 首末解交汇分析的间分判断
 //——优化 动态内存分配
 //——修复 再次进入游戏时可能持续翻开方块
-//——修复 错误标记时引起的其他闪退
 --------------------------------*/
