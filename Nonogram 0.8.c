@@ -3,8 +3,9 @@
 #include <time.h>
 #include <windows.h>
 
-#define LimHeight 24
-#define LimWidth 24
+#define LimLength 24
+#define LimHeight LimLength
+#define LimWidth LimLength
 #define RefreshCycle 50
 
 int isMine[LimHeight][LimWidth];
@@ -16,10 +17,10 @@ int rowNumberColor[LimHeight][(LimWidth+1)/2];
 int columnNumberColor[(LimHeight+1)/2][LimWidth];
 
 // 标准线
-int* lineMine = 0;
-int* lineOpen = 0;
-int* lineSolution = 0;
-int* lineNumber = 0;
+int lineMine[LimLength];
+int lineOpen[LimLength];
+int lineSolution[LimLength];
+int lineNumber[(LimLength+1)/2];
 int lengthOfLine;
 int countOfLineNumber;
 
@@ -47,8 +48,8 @@ struct LinesIterator LinesIteratorBegin();
 int IsLinesIteratorEnd(struct LinesIterator li);
 void LinesIteratorNext(struct LinesIterator* li);
 //int PutNumber(int* mine, int pos, int number);
-int* LineFirstSolutionMine();
-int* LineLastSolutionMine();
+int* LineFirstSolutionPosList();
+int* LineLastSolutionPosList();
 int SolveLine(struct LinesIterator li);
 //int AirWeaveLine(struct LinesIterator li);
 int SolveStep();
@@ -414,7 +415,7 @@ int main()
 					}
 				}
 			}
-			printf("\rseed=%d", seed);
+			printf("\rseed=%d", seed-1);
 			printf("\n胜利数：%d 用时：%d 步数：%d\n", countWin, time(0)-t0, countStep);
 			printf("正确翻开%d 正确标记%d 翻开雷%d 错误标记%d\n", count[0][1], count[1][2], count[1][1], count[0][2]);
 			summonCheckMode = temp;
@@ -433,6 +434,56 @@ int main()
 			}
 			summonCheckMode = temp;
 			debug = 0;
+		}
+		else if(choiceMode == 7)//随机求解测试
+		{
+			int n, i;
+			srand(0);
+			t0 = time(0);
+			for(seed=0; seed<10000000; seed++)
+			{
+				if(seed % 8192 == 0) printf("\r%d", seed);
+				//n = seed;
+				for(c=0; c<widthOfBoard; c++)
+				{
+					/*isMine[0][c] = n%6/2;
+					isOpen[0][c] = n%6%3;
+					n/=6;*/
+					isMine[0][c] = rand()%2;
+					isOpen[0][c] = rand()%3;
+				}
+				for(c=0; c<lengthOfRowNumber; c++)
+				{
+					rowNumber[0][c] = 0;
+				}
+				n = 0;
+				i = lengthOfRowNumber-1;
+				for(c=widthOfBoard-1; c>=0; c--)
+				{
+					if(isMine[0][c] == 0)
+					{
+						if(n != 0)
+						{
+							rowNumber[0][i] = n;
+							n = 0;
+							i--;
+						}
+					}
+					else
+					{
+						n++;
+					}
+				}
+				if(n != 0)
+				{
+					rowNumber[0][i] = n;
+					n = 0;
+					i--;
+				}
+				SolveLine(LinesIteratorBegin());
+			}
+			printf("\r%d\n", seed-1);
+			printf("稳定性通过！标准线长：%d 用时：%d\n", lengthOfLine, time(0)-t0);
 		}
 		else// if(choiceMode == 3)
 		{
@@ -1045,17 +1096,11 @@ void RecoverLine(int r, int c, int mode)//0生成line，1写出
 		if(mode == 0)
 		{
 			lengthOfLine = widthOfBoard;
-			if(lineMine != 0) free(lineMine);
-			if(lineOpen != 0) free(lineOpen);
-			if(lineSolution != 0) free(lineSolution);
-			lineMine =(int*) calloc(lengthOfLine, sizeof(int));
-			lineOpen =(int*) calloc(lengthOfLine, sizeof(int));
-			lineSolution =(int*) calloc(lengthOfLine, sizeof(int));
 			for(i=0; i<lengthOfLine; i++)
 			{
 				lineMine[i] = isMine[r][i];
 				lineOpen[i] = isOpen[r][i];
-				//lineSolution[i] = solution[r][i];
+				lineSolution[i] = 0;
 			}
 			countOfLineNumber = (lengthOfLine+1)/2;
 			for(i=0; i<(lengthOfLine+1)/2; i++)
@@ -1063,8 +1108,6 @@ void RecoverLine(int r, int c, int mode)//0生成line，1写出
 				if(rowNumber[r][i] == 0) countOfLineNumber--;
 				else break;
 			}
-			if(lineNumber != 0) free(lineNumber);
-			lineNumber =(int*) calloc(countOfLineNumber, sizeof(int));
 			for(i0=i; i<(lengthOfLine+1)/2; i++)
 			{
 				lineNumber[i-i0] = rowNumber[r][i];
@@ -1087,17 +1130,11 @@ void RecoverLine(int r, int c, int mode)//0生成line，1写出
 		if(mode == 0)
 		{
 			lengthOfLine = heightOfBoard;
-			if(lineMine != 0) free(lineMine);
-			if(lineOpen != 0) free(lineOpen);
-			if(lineSolution != 0) free(lineSolution);
-			lineMine =(int*) calloc(lengthOfLine, sizeof(int));
-			lineOpen =(int*) calloc(lengthOfLine, sizeof(int));
-			lineSolution =(int*) calloc(lengthOfLine, sizeof(int));
 			for(i=0; i<lengthOfLine; i++)
 			{
 				lineMine[i] = isMine[i][c];
 				lineOpen[i] = isOpen[i][c];
-				//lineSolution[i] = solution[i][c];
+				lineSolution[i] = 0;
 			}
 			countOfLineNumber = (lengthOfLine+1)/2;
 			for(i=0; i<(lengthOfLine+1)/2; i++)
@@ -1105,8 +1142,6 @@ void RecoverLine(int r, int c, int mode)//0生成line，1写出
 				if(columnNumber[i][c] == 0) countOfLineNumber--;
 				else break;
 			}
-			if(lineNumber != 0) free(lineNumber);
-			lineNumber =(int*) calloc(countOfLineNumber, sizeof(int));
 			for(i0=i; i<(lengthOfLine+1)/2; i++)
 			{
 				lineNumber[i-i0] = columnNumber[i][c];
@@ -1180,9 +1215,9 @@ int PutNumber(int* mine, int pos, int number)//尝试放置数字，基于标准
 	return 1;
 }
 */
-int* LineFirstSolutionMine()//生成标准线首解雷场
+int* LineFirstSolutionPosList()//生成标准线首解位置表
 {
-	int* mine =(int*) calloc(lengthOfLine, sizeof(int));
+	int* posList =(int*) calloc(countOfLineNumber, sizeof(int));
 	int i, pos = 0, put, number, j;
 	for(i=0; i<countOfLineNumber; )
 	{
@@ -1195,7 +1230,7 @@ int* LineFirstSolutionMine()//生成标准线首解雷场
 			pos++;//单步跳过该位置
 			if(pos + number > lengthOfLine)//无解情况
 			{
-				free(mine);
+				free(posList);
 				return NULL;
 			}
 		}
@@ -1210,7 +1245,7 @@ int* LineFirstSolutionMine()//生成标准线首解雷场
 					pos = j+1;//多步连跳到翻开位置
 					if(pos + number > lengthOfLine)//无解情况
 					{
-						free(mine);
+						free(posList);
 						return NULL;
 					}
 					break;
@@ -1219,21 +1254,18 @@ int* LineFirstSolutionMine()//生成标准线首解雷场
 			if(put == 1)
 			{
 				//放置
-				for(j=pos; j<pos+number; j++)
-				{
-					mine[j] = 1;
-				}
+				posList[i] = pos;
 				pos += number+1;
 				i++;
 			}
 		}
 	}
-	return mine;
+	return posList;
 }
 
-int* LineLastSolutionMine()//生成标准线末解雷场
+int* LineLastSolutionPosList()//生成标准线末解位置表
 {
-	int* mine =(int*) calloc(lengthOfLine, sizeof(int));
+	int* posList =(int*) calloc(countOfLineNumber, sizeof(int));
 	int i, pos = lengthOfLine-1, put, number, j;
 	for(i=countOfLineNumber-1; i>=0; )
 	{
@@ -1244,9 +1276,9 @@ int* LineLastSolutionMine()//生成标准线末解雷场
 		   || (pos+1 < lengthOfLine && lineOpen[pos+1] == 2))//头部为标记
 		{
 			pos--;//单步跳过该位置
-			if(pos < 0)//无解情况
+			if(pos - number + 1 < 0)//无解情况
 			{
-				free(mine);
+				free(posList);
 				return NULL;
 			}
 		}
@@ -1259,9 +1291,9 @@ int* LineLastSolutionMine()//生成标准线末解雷场
 				{
 					put = 0;
 					pos = j-1;//多步连跳到翻开位置
-					if(pos < 0)//无解情况
+					if(pos - number + 1 < 0)//无解情况
 					{
-						free(mine);
+						free(posList);
 						return NULL;
 					}
 				}
@@ -1269,16 +1301,13 @@ int* LineLastSolutionMine()//生成标准线末解雷场
 			if(put == 1)
 			{
 				//放置
-				for(j=pos; j>pos-number; j--)
-				{
-					mine[j] = 1;
-				}
+				posList[i] = pos-number+1;
 				pos -= number+1;
 				i--;
 			}
 		}
 	}
-	return mine;
+	return posList;
 }
 
 int SolveLine(struct LinesIterator li)
@@ -1286,36 +1315,6 @@ int SolveLine(struct LinesIterator li)
 	int i, ni, nipos, check;
 	//生成标准线
 	RecoverLine(li.r, li.c, 0);
-	if(debug)
-	{
-		printf("定位标准线(%d,%d)\n", li.r, li.c);
-		/*printf("lengthOfLine=%d\n", lengthOfLine);
-		printf("countOfLineNumber=%d\n", countOfLineNumber);
-		printf("lineMine：");
-		for(i=0; i<lengthOfLine; i++)
-		{
-			printf("%d ", lineMine[i]);
-		}
-		printf("\n");
-		printf("lineOpen：");
-		for(i=0; i<lengthOfLine; i++)
-		{
-			printf("%d ", lineOpen[i]);
-		}
-		printf("\n");
-		printf("lineSolution：");
-		for(i=0; i<lengthOfLine; i++)
-		{
-			printf("%d ", lineSolution[i]);
-		}
-		printf("\n");*/
-		printf("lineNumber：");
-		for(i=0; i<countOfLineNumber; i++)
-		{
-			printf("%d ", lineNumber[i]);
-		}
-		printf("\n");
-	}
 	//端向心分析
 	int nstart, nend, nlimit;
 	//头向尾分析
@@ -1393,6 +1392,7 @@ int SolveLine(struct LinesIterator li)
 			}
 			else//大数预置分析
 			{
+				if(i+lineNumber[ni]-1 >= lengthOfLine) break;//无解情况
 				nipos = i;
 				check = 0;
 				for(i = nipos+lineNumber[ni]-1; i > nipos; i--)
@@ -1495,6 +1495,7 @@ int SolveLine(struct LinesIterator li)
 		}
 		else if(lineOpen[i] == 2)
 		{
+			if(i+lineNumber[ni]-1 >= lengthOfLine) break;//无解情况
 			for(nipos = i; i < nipos+lineNumber[ni]; i++)//顺延标记
 			{
 				if(lineOpen[i] == 0) lineSolution[i] = 2;
@@ -1635,6 +1636,7 @@ int SolveLine(struct LinesIterator li)
 			}
 			else//大数预置分析
 			{
+				if(i-lineNumber[ni]+1 < 0) break;//无解情况
 				nipos = i;
 				check = 0;
 				for(i = nipos-lineNumber[ni]+1; i < nipos; i++)
@@ -1731,6 +1733,7 @@ int SolveLine(struct LinesIterator li)
 		}
 		else if(lineOpen[i] == 2)
 		{
+			if(i-lineNumber[ni]+1 < 0) break;//无解情况
 			for(nipos = i; i > nipos-lineNumber[ni]; i--)//顺延标记
 			{
 				if(lineOpen[i] == 0) lineSolution[i] = 2;
@@ -1794,31 +1797,30 @@ int SolveLine(struct LinesIterator li)
 		}
 	}
 	//首末解交汇分析
-	int* firstMine = LineFirstSolutionMine();//生成首解雷场
-	int* lastMine = LineLastSolutionMine();//生成末解雷场
-	if(firstMine != NULL && lastMine != NULL)
+	int* firstPosList = LineFirstSolutionPosList();//生成首解
+	int* lastPosList = LineLastSolutionPosList();//生成末解
+	if(firstPosList != NULL && lastPosList != NULL)
 	{
 		//简单数字分析，可判断端收束顶满线、大数半满偏移
 		int n1pos = 0, n2pos = 0;
 		/*if(countOfLineNumber > 0)//线首翻开
 		{
-			while(n1pos+lineNumber[0] < lengthOfLine && firstMine[n1pos] == 0)
+			for(i=0; i<firstPosList[0]; i++)
 			{
-				if(lineOpen[n1pos] == 0) lineSolution[n1pos] = 1;
-				n1pos++;
+				if(lineOpen[i] == 0) lineSolution[i] = 1;
 			}
 		}*/
 		for(ni=0; ni<countOfLineNumber; ni++)
 		{
-			while(n1pos+lineNumber[ni] < lengthOfLine && firstMine[n1pos] == 0) n1pos++;
-			/*if(ni > 0 && n2pos < n1pos)//间分判断，末解前数尾和首解后数头之间翻开
+			n1pos = firstPosList[ni];
+			/*if(ni > 0 && n2pos+lineNumber[ni-1] < n1pos)//间分判断，末解前数尾和首解后数头之间翻开
 			{
-				for(i = n2pos; i < n1pos; i++)
+				for(i = n2pos+lineNumber[ni-1]; i < n1pos; i++)
 				{
 					if(lineOpen[i] == 0) lineSolution[i] = 1;
 				}
 			}*/
-			while(n2pos+lineNumber[ni] < lengthOfLine && lastMine[n2pos] == 0) n2pos++;
+			n2pos = lastPosList[ni];
 			if(n1pos == n2pos)//数字确定
 			{
 				if(n1pos > 0 && lineOpen[n1pos-1] == 0)//头部翻开
@@ -1841,12 +1843,10 @@ int SolveLine(struct LinesIterator li)
 					if(lineOpen[i] == 0) lineSolution[i] = 2;
 				}
 			}
-			n1pos += lineNumber[ni];
-			n2pos += lineNumber[ni];
 		}
-		/*if(n2pos < lengthOfLine)//线尾翻开
+		/*if(lastPosList[countOfLineNumber-1]+lineNumber[countOfLineNumber-1] < lengthOfLine)//线尾翻开
 		{
-			for(i=n2pos; i<lengthOfLine; i++)
+			for(i=lastPosList[countOfLineNumber-1]+lineNumber[countOfLineNumber-1]; i<lengthOfLine; i++)
 			{
 				if(lineOpen[i] == 0) lineSolution[i] = 1;
 			}
@@ -1854,8 +1854,8 @@ int SolveLine(struct LinesIterator li)
 	}
 	else//存在错误标记
 	{
-		if(firstMine != NULL) free(firstMine);
-		if(lastMine != NULL) free(lastMine);
+		if(firstPosList != NULL) free(firstPosList);
+		if(lastPosList != NULL) free(lastPosList);
 		return 0;
 	}
 	//完成分析，判断首末解不完全相同的完成情况
@@ -1892,21 +1892,42 @@ int SolveLine(struct LinesIterator li)
 	}
 	if(debug)
 	{
-		if(firstMine != NULL)
+		printf("定位标准线(%d,%d)\n", li.r, li.c);
+		printf("lengthOfLine=%d\n", lengthOfLine);
+		printf("countOfLineNumber=%d\n", countOfLineNumber);
+		printf("lineMine：");
+		for(i=0; i<lengthOfLine; i++)
+		{
+			printf("%d ", lineMine[i]);
+		}
+		printf("\n");
+		printf("lineOpen：");
+		for(i=0; i<lengthOfLine; i++)
+		{
+			printf("%d ", lineOpen[i]);
+		}
+		printf("\n");
+		printf("lineNumber：");
+		for(i=0; i<countOfLineNumber; i++)
+		{
+			printf("%d ", lineNumber[i]);
+		}
+		printf("\n");
+		if(firstPosList != NULL)
 		{
 			printf("首解：");
-			for(i=0; i<lengthOfLine; i++)
+			for(i=0; i<countOfLineNumber; i++)
 			{
-				printf("%d ", firstMine[i]);
+				printf("%d ", firstPosList[i]);
 			}
 			printf("\n");
 		}
-		if(lastMine != NULL)
+		if(lastPosList != NULL)
 		{
 			printf("末解：");
-			for(i=0; i<lengthOfLine; i++)
+			for(i=0; i<countOfLineNumber; i++)
 			{
-				printf("%d ", lastMine[i]);
+				printf("%d ", lastPosList[i]);
 			}
 			printf("\n");
 		}
@@ -1924,8 +1945,8 @@ int SolveLine(struct LinesIterator li)
 	}
 	//标准线解写出
 	RecoverLine(li.r, li.c, 1);
-	if(firstMine != NULL) free(firstMine);
-	if(lastMine != NULL) free(lastMine);
+	if(firstPosList != NULL) free(firstPosList);
+	if(lastPosList != NULL) free(lastPosList);
 	//返回是否存在解
 	for(i=0; i<lengthOfLine; i++)
 	{
@@ -2091,6 +2112,10 @@ Nonogram 0.7
 ——优化 首末解交汇分析不再翻开线首和线尾
 ——优化 重构完成分析
 ——修复 错误标记Tab后不失败
+Nonogram 0.8
+——优化 首末解以位置表代替雷场提升性能
+——优化 标准线使用固定内存
+——修复 非法情况端向心分析可能闪退
 //——新增 拖动标记根据起始操作统一标记/取消标记
 //——新增 按空格执行标记校验改为翻开全部未标记方块
 //——新增 首末解交汇分析的间分判断

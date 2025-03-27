@@ -3,10 +3,17 @@
 #include <stdlib.h>
 #include <time.h>
 #include <math.h>
-#include <graphics.h>
-
-#define LimHeight 24
-#define LimWidth 24
+#include <graphics.h>//链接参数-mwindows
+/**
+ * 数织 Easy Nonogram
+ *
+ * by Ltabsyy
+ * 
+ * https://github.com/Ltabsyy/Nonogram
+ **/
+#define LimLength 24
+#define LimHeight LimLength
+#define LimWidth LimLength
 #define RefreshCycle 50
 #define DragDeviation 1
 #define InvalidPosition -2147483648
@@ -20,10 +27,10 @@ color_t rowNumberColor[LimHeight][(LimWidth+1)/2];
 color_t columnNumberColor[(LimHeight+1)/2][LimWidth];
 
 // 标准线
-int* lineMine = 0;
-int* lineOpen = 0;
-int* lineSolution = 0;
-int* lineNumber = 0;
+int lineMine[LimLength];
+int lineOpen[LimLength];
+int lineSolution[LimLength];
+int lineNumber[(LimLength+1)/2];
 int lengthOfLine;
 int countOfLineNumber;
 
@@ -44,7 +51,7 @@ int cursorR = InvalidPosition, cursorC = InvalidPosition;
 void DrawBlock(int r, int c, int isMine, int isOpen);
 void DrawLineA(int x0, int y0, int r, int angle);
 void DrawClock(int x0, int y0, int r);
-void DrawWindow(int mode, int time, color_t timeColor);
+void DrawWindow(int mode, int mstime, color_t timeColor);
 void DrawTipLine(int r1, int c1, int r2, int c2);
 void InitWindow(int mode);
 void Operate(char operation, int r, int c);
@@ -60,8 +67,8 @@ struct LinesIterator//标准线组迭代器
 struct LinesIterator LinesIteratorBegin();
 int IsLinesIteratorEnd(struct LinesIterator li);
 void LinesIteratorNext(struct LinesIterator* li);
-int* LineFirstSolutionMine();
-int* LineLastSolutionMine();
+int* LineFirstSolutionPosList();
+int* LineLastSolutionPosList();
 int SolveLine(struct LinesIterator li);
 //int AirWeaveLine(struct LinesIterator li);
 int SolveStep();
@@ -168,6 +175,8 @@ int main()
 	}
 	lengthOfRowNumber = (widthOfBoard+1)/2;
 	lengthOfColumnNumber = (heightOfBoard+1)/2;
+	if(lengthOfRowNumber < 2) lengthOfRowNumber = 2;
+	if(lengthOfColumnNumber < 2) lengthOfColumnNumber = 2;
 	// 游戏
 	InitWindow(1);
 	int newGame = 1;
@@ -181,7 +190,7 @@ int main()
 		while(1)
 		{
 			t1 = clock();
-			DrawWindow(0, (t1-t0+500)/1000, WHITE);
+			DrawWindow(0, t1-t0, WHITE);
 			DrawTipLine(r1, c1, r2, c2);
 			operation = 0;
 			isEnd = 0;
@@ -215,7 +224,7 @@ int main()
 					else if(sideLength > 16) sideLength -= 4;
 					resizewindow((lengthOfRowNumber+widthOfBoard)*sideLength, (lengthOfColumnNumber+heightOfBoard)*sideLength);
 					setfont(sideLength, 0, "Consolas");
-					DrawWindow(0, (t1-t0+500)/1000, WHITE);
+					DrawWindow(0, t1-t0, WHITE);
 				}
 				if(r1 != r2 && c1 != c2)//修正拖动偏差
 				{
@@ -325,15 +334,15 @@ int main()
 			delay_ms(RefreshCycle);
 		}
 		t1 = clock();
-		if(isEnd == 1) DrawWindow(1, (t1-t0+500)/1000, YELLOW);
-		else DrawWindow(1, (t1-t0+500)/1000, RED);
+		if(isEnd == 1) DrawWindow(1, t1-t0, YELLOW);
+		else DrawWindow(1, t1-t0, RED);
 		delay_ms(1000);
 		flushmouse();
 		newGame = -1;
 		while(newGame == -1)
 		{
-			if(isEnd == 1) DrawWindow(1, (t1-t0+500)/1000, YELLOW);
-			else DrawWindow(1, (t1-t0+500)/1000, RED);
+			if(isEnd == 1) DrawWindow(1, t1-t0, YELLOW);
+			else DrawWindow(1, t1-t0, RED);
 			setfont(sideLength/2, 0, "黑体");
 			setcolor(RED);
 			xyprintf(sideLength/4, sideLength*2, "左键新游戏");
@@ -360,8 +369,8 @@ int main()
 					else if(sideLength > 16) sideLength -= 4;
 					resizewindow((lengthOfRowNumber+widthOfBoard)*sideLength, (lengthOfColumnNumber+heightOfBoard)*sideLength);
 					setfont(sideLength, 0, "Consolas");
-					if(isEnd == 1) DrawWindow(1, (t1-t0+500)/1000, YELLOW);
-					else DrawWindow(1, (t1-t0+500)/1000, RED);
+					if(isEnd == 1) DrawWindow(1, t1-t0, YELLOW);
+					else DrawWindow(1, t1-t0, RED);
 				}
 			}
 			while(kbmsg())
@@ -460,7 +469,7 @@ void DrawClock(int x0, int y0, int r)//绘制时钟
 	ege_fillellipse(x0-r/10, y0-r/10, r/5, r/5);
 }
 
-void DrawWindow(int mode, int time, color_t timeColor)
+void DrawWindow(int mode, int mstime, color_t timeColor)
 {
 	int r, c;
 	cleardevice();
@@ -557,7 +566,10 @@ void DrawWindow(int mode, int time, color_t timeColor)
 	//用时
 	DrawClock(sideLength/2, sideLength*3/2, sideLength*10/32);
 	setcolor(timeColor);
-	xyprintf(sideLength, sideLength, "%ds", time);
+	if(timeColor == WHITE) xyprintf(sideLength, sideLength, "%d", mstime/1000);//游戏时去尾，终局四舍五入
+	//else if(mstime < 10*1000) xyprintf(sideLength, sideLength, "%.2f", (float)mstime/1000);//刷新周期50ms下无意义
+	else if(mstime < 100*1000) xyprintf(sideLength, sideLength, "%.1f", (float)mstime/1000);//仅在100秒内显示1位小数
+	else xyprintf(sideLength, sideLength, "%d", (mstime+500)/1000);
 	//悬浮高亮
 	if(cursorR != InvalidPosition && cursorC != InvalidPosition)
 	{
@@ -911,17 +923,11 @@ void RecoverLine(int r, int c, int mode)//0生成line，1写出
 		if(mode == 0)
 		{
 			lengthOfLine = widthOfBoard;
-			if(lineMine != 0) free(lineMine);
-			if(lineOpen != 0) free(lineOpen);
-			if(lineSolution != 0) free(lineSolution);
-			lineMine =(int*) calloc(lengthOfLine, sizeof(int));
-			lineOpen =(int*) calloc(lengthOfLine, sizeof(int));
-			lineSolution =(int*) calloc(lengthOfLine, sizeof(int));
 			for(i=0; i<lengthOfLine; i++)
 			{
 				lineMine[i] = isMine[r][i];
 				lineOpen[i] = isOpen[r][i];
-				//lineSolution[i] = solution[r][i];
+				lineSolution[i] = 0;
 			}
 			countOfLineNumber = (lengthOfLine+1)/2;
 			for(i=0; i<(lengthOfLine+1)/2; i++)
@@ -929,8 +935,6 @@ void RecoverLine(int r, int c, int mode)//0生成line，1写出
 				if(rowNumber[r][i] == 0) countOfLineNumber--;
 				else break;
 			}
-			if(lineNumber != 0) free(lineNumber);
-			lineNumber =(int*) calloc(countOfLineNumber, sizeof(int));
 			for(i0=i; i<(lengthOfLine+1)/2; i++)
 			{
 				lineNumber[i-i0] = rowNumber[r][i];
@@ -953,17 +957,11 @@ void RecoverLine(int r, int c, int mode)//0生成line，1写出
 		if(mode == 0)
 		{
 			lengthOfLine = heightOfBoard;
-			if(lineMine != 0) free(lineMine);
-			if(lineOpen != 0) free(lineOpen);
-			if(lineSolution != 0) free(lineSolution);
-			lineMine =(int*) calloc(lengthOfLine, sizeof(int));
-			lineOpen =(int*) calloc(lengthOfLine, sizeof(int));
-			lineSolution =(int*) calloc(lengthOfLine, sizeof(int));
 			for(i=0; i<lengthOfLine; i++)
 			{
 				lineMine[i] = isMine[i][c];
 				lineOpen[i] = isOpen[i][c];
-				//lineSolution[i] = solution[i][c];
+				lineSolution[i] = 0;
 			}
 			countOfLineNumber = (lengthOfLine+1)/2;
 			for(i=0; i<(lengthOfLine+1)/2; i++)
@@ -971,8 +969,6 @@ void RecoverLine(int r, int c, int mode)//0生成line，1写出
 				if(columnNumber[i][c] == 0) countOfLineNumber--;
 				else break;
 			}
-			if(lineNumber != 0) free(lineNumber);
-			lineNumber =(int*) calloc(countOfLineNumber, sizeof(int));
 			for(i0=i; i<(lengthOfLine+1)/2; i++)
 			{
 				lineNumber[i-i0] = columnNumber[i][c];
@@ -1026,9 +1022,9 @@ void LinesIteratorNext(struct LinesIterator* li)
 	}
 }
 
-int* LineFirstSolutionMine()//生成标准线首解雷场
+int* LineFirstSolutionPosList()//生成标准线首解位置表
 {
-	int* mine =(int*) calloc(lengthOfLine, sizeof(int));
+	int* posList =(int*) calloc(countOfLineNumber, sizeof(int));
 	int i, pos = 0, put, number, j;
 	for(i=0; i<countOfLineNumber; )
 	{
@@ -1041,7 +1037,7 @@ int* LineFirstSolutionMine()//生成标准线首解雷场
 			pos++;//单步跳过该位置
 			if(pos + number > lengthOfLine)//无解情况
 			{
-				free(mine);
+				free(posList);
 				return NULL;
 			}
 		}
@@ -1056,7 +1052,7 @@ int* LineFirstSolutionMine()//生成标准线首解雷场
 					pos = j+1;//多步连跳到翻开位置
 					if(pos + number > lengthOfLine)//无解情况
 					{
-						free(mine);
+						free(posList);
 						return NULL;
 					}
 					break;
@@ -1065,21 +1061,18 @@ int* LineFirstSolutionMine()//生成标准线首解雷场
 			if(put == 1)
 			{
 				//放置
-				for(j=pos; j<pos+number; j++)
-				{
-					mine[j] = 1;
-				}
+				posList[i] = pos;
 				pos += number+1;
 				i++;
 			}
 		}
 	}
-	return mine;
+	return posList;
 }
 
-int* LineLastSolutionMine()//生成标准线末解雷场
+int* LineLastSolutionPosList()//生成标准线末解位置表
 {
-	int* mine =(int*) calloc(lengthOfLine, sizeof(int));
+	int* posList =(int*) calloc(countOfLineNumber, sizeof(int));
 	int i, pos = lengthOfLine-1, put, number, j;
 	for(i=countOfLineNumber-1; i>=0; )
 	{
@@ -1090,9 +1083,9 @@ int* LineLastSolutionMine()//生成标准线末解雷场
 		   || (pos+1 < lengthOfLine && lineOpen[pos+1] == 2))//头部为标记
 		{
 			pos--;//单步跳过该位置
-			if(pos < 0)//无解情况
+			if(pos - number + 1 < 0)//无解情况
 			{
-				free(mine);
+				free(posList);
 				return NULL;
 			}
 		}
@@ -1105,9 +1098,9 @@ int* LineLastSolutionMine()//生成标准线末解雷场
 				{
 					put = 0;
 					pos = j-1;//多步连跳到翻开位置
-					if(pos < 0)//无解情况
+					if(pos - number + 1 < 0)//无解情况
 					{
-						free(mine);
+						free(posList);
 						return NULL;
 					}
 				}
@@ -1115,16 +1108,13 @@ int* LineLastSolutionMine()//生成标准线末解雷场
 			if(put == 1)
 			{
 				//放置
-				for(j=pos; j>pos-number; j--)
-				{
-					mine[j] = 1;
-				}
+				posList[i] = pos-number+1;
 				pos -= number+1;
 				i--;
 			}
 		}
 	}
-	return mine;
+	return posList;
 }
 
 int SolveLine(struct LinesIterator li)
@@ -1209,6 +1199,7 @@ int SolveLine(struct LinesIterator li)
 			}
 			else//大数预置分析
 			{
+				if(i+lineNumber[ni]-1 >= lengthOfLine) break;//无解情况
 				nipos = i;
 				check = 0;
 				for(i = nipos+lineNumber[ni]-1; i > nipos; i--)
@@ -1311,6 +1302,7 @@ int SolveLine(struct LinesIterator li)
 		}
 		else if(lineOpen[i] == 2)
 		{
+			if(i+lineNumber[ni]-1 >= lengthOfLine) break;//无解情况
 			for(nipos = i; i < nipos+lineNumber[ni]; i++)//顺延标记
 			{
 				if(lineOpen[i] == 0) lineSolution[i] = 2;
@@ -1424,6 +1416,7 @@ int SolveLine(struct LinesIterator li)
 			}
 			else//大数预置分析
 			{
+				if(i-lineNumber[ni]+1 < 0) break;//无解情况
 				nipos = i;
 				check = 0;
 				for(i = nipos-lineNumber[ni]+1; i < nipos; i++)
@@ -1520,6 +1513,7 @@ int SolveLine(struct LinesIterator li)
 		}
 		else if(lineOpen[i] == 2)
 		{
+			if(i-lineNumber[ni]+1 < 0) break;//无解情况
 			for(nipos = i; i > nipos-lineNumber[ni]; i--)//顺延标记
 			{
 				if(lineOpen[i] == 0) lineSolution[i] = 2;
@@ -1556,31 +1550,30 @@ int SolveLine(struct LinesIterator li)
 		}
 	}
 	//首末解交汇分析
-	int* firstMine = LineFirstSolutionMine();//生成首解雷场
-	int* lastMine = LineLastSolutionMine();//生成末解雷场
-	if(firstMine != NULL && lastMine != NULL)
+	int* firstPosList = LineFirstSolutionPosList();//生成首解
+	int* lastPosList = LineLastSolutionPosList();//生成末解
+	if(firstPosList != NULL && lastPosList != NULL)
 	{
 		//简单数字分析，可判断端收束顶满线、大数半满偏移
 		int n1pos = 0, n2pos = 0;
 		/*if(countOfLineNumber > 0)//线首翻开
 		{
-			while(n1pos+lineNumber[0] < lengthOfLine && firstMine[n1pos] == 0)
+			for(i=0; i<firstPosList[0]; i++)
 			{
-				if(lineOpen[n1pos] == 0) lineSolution[n1pos] = 1;
-				n1pos++;
+				if(lineOpen[i] == 0) lineSolution[i] = 1;
 			}
 		}*/
 		for(ni=0; ni<countOfLineNumber; ni++)
 		{
-			while(n1pos+lineNumber[ni] < lengthOfLine && firstMine[n1pos] == 0) n1pos++;
-			/*if(ni > 0 && n2pos < n1pos)//间分判断，末解前数尾和首解后数头之间翻开
+			n1pos = firstPosList[ni];
+			/*if(ni > 0 && n2pos+lineNumber[ni-1] < n1pos)//间分判断，末解前数尾和首解后数头之间翻开
 			{
-				for(i = n2pos; i < n1pos; i++)
+				for(i = n2pos+lineNumber[ni-1]; i < n1pos; i++)
 				{
 					if(lineOpen[i] == 0) lineSolution[i] = 1;
 				}
 			}*/
-			while(n2pos+lineNumber[ni] < lengthOfLine && lastMine[n2pos] == 0) n2pos++;
+			n2pos = lastPosList[ni];
 			if(n1pos == n2pos)//数字确定
 			{
 				if(n1pos > 0 && lineOpen[n1pos-1] == 0)//头部翻开
@@ -1603,12 +1596,10 @@ int SolveLine(struct LinesIterator li)
 					if(lineOpen[i] == 0) lineSolution[i] = 2;
 				}
 			}
-			n1pos += lineNumber[ni];
-			n2pos += lineNumber[ni];
 		}
-		/*if(n2pos < lengthOfLine)//线尾翻开
+		/*if(lastPosList[countOfLineNumber-1]+lineNumber[countOfLineNumber-1] < lengthOfLine)//线尾翻开
 		{
-			for(i=n2pos; i<lengthOfLine; i++)
+			for(i=lastPosList[countOfLineNumber-1]+lineNumber[countOfLineNumber-1]; i<lengthOfLine; i++)
 			{
 				if(lineOpen[i] == 0) lineSolution[i] = 1;
 			}
@@ -1616,8 +1607,8 @@ int SolveLine(struct LinesIterator li)
 	}
 	else//存在错误标记
 	{
-		if(firstMine != NULL) free(firstMine);
-		if(lastMine != NULL) free(lastMine);
+		if(firstPosList != NULL) free(firstPosList);
+		if(lastPosList != NULL) free(lastPosList);
 		return 0;
 	}
 	//完成分析，判断首末解不完全相同的完成情况
@@ -1654,8 +1645,8 @@ int SolveLine(struct LinesIterator li)
 	}
 	//标准线解写出
 	RecoverLine(li.r, li.c, 1);
-	if(firstMine != NULL) free(firstMine);
-	if(lastMine != NULL) free(lastMine);
+	if(firstPosList != NULL) free(firstPosList);
+	if(lastPosList != NULL) free(lastPosList);
 	//返回是否存在解
 	for(i=0; i<lengthOfLine; i++)
 	{
@@ -1731,4 +1722,8 @@ Easy Nonogram 0.6
 ——优化 算法跟随Nonogram 0.7升级
 ——优化 更精确的计算用时
 ——优化 游戏结束时延时一秒防误触
+Easy Nonogram 0.7
+——新增 游戏结束时小于100秒的用时显示小数
+——优化 过小地图维持数字占用长度至少为2
+——优化 算法跟随Nonogram 0.8升级
 --------------------------------*/
