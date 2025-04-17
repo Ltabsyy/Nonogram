@@ -3,18 +3,19 @@
 #include <time.h>
 #include <windows.h>
 
-#define LimLength 24
+#define LimLength 24//为LimHeight和LimWidth的较大值
 #define LimHeight LimLength
 #define LimWidth LimLength
 #define RefreshCycle 50
 
 int isMine[LimHeight][LimWidth];
 int isOpen[LimHeight][LimWidth];
-int solution[LimHeight][LimWidth];
 int rowNumber[LimHeight][(LimWidth+1)/2];
 int columnNumber[(LimHeight+1)/2][LimWidth];
 int rowNumberColor[LimHeight][(LimWidth+1)/2];
 int columnNumberColor[(LimHeight+1)/2][LimWidth];
+int rowNumberIsGrayed[LimHeight][(LimWidth+1)/2];
+int columnNumberIsGrayed[(LimHeight+1)/2][LimWidth];
 
 // 标准线
 int lineMine[LimLength];
@@ -27,10 +28,9 @@ int countOfLineNumber;
 int heightOfBoard = 6;
 int widthOfBoard = 6;
 int numberOfMine = 27;
-int summonCheckMode = 3;
-
 int lengthOfRowNumber = 3;
 int lengthOfColumnNumber = 3;
+int summonCheckMode = 3;
 
 int debug = 0;
 int countStep = 0;
@@ -196,26 +196,7 @@ int main()
 							if(rcd.Event.MouseEvent.dwButtonState == FROM_LEFT_1ST_BUTTON_PRESSED
 								|| rcd.Event.MouseEvent.dwButtonState == RIGHTMOST_BUTTON_PRESSED)
 							{
-								if(rowNumberColor[r][c+lengthOfRowNumber] != 0x08)
-								{
-									rowNumberColor[r][c+lengthOfRowNumber] = 0x08;
-								}
-								else if(rowNumber[r][c+lengthOfRowNumber] == widthOfBoard)
-								{
-									rowNumberColor[r][c+lengthOfRowNumber] = 0x01;
-								}
-								else if(rowNumber[r][c+lengthOfRowNumber] > widthOfBoard/2)
-								{
-									rowNumberColor[r][c+lengthOfRowNumber] = 0x02;
-								}
-								else if(rowNumber[r][c+lengthOfRowNumber] > widthOfBoard/3)
-								{
-									rowNumberColor[r][c+lengthOfRowNumber] = 0x04;
-								}
-								else
-								{
-									rowNumberColor[r][c+lengthOfRowNumber] = 0x07;
-								}
+								rowNumberIsGrayed[r][c+lengthOfRowNumber] = !rowNumberIsGrayed[r][c+lengthOfRowNumber];
 								break;
 							}
 						}
@@ -224,26 +205,7 @@ int main()
 							if(rcd.Event.MouseEvent.dwButtonState == FROM_LEFT_1ST_BUTTON_PRESSED
 								|| rcd.Event.MouseEvent.dwButtonState == RIGHTMOST_BUTTON_PRESSED)
 							{
-								if(columnNumberColor[r+lengthOfColumnNumber][c] != 0x08)
-								{
-									columnNumberColor[r+lengthOfColumnNumber][c] = 0x08;
-								}
-								else if(columnNumber[r+lengthOfColumnNumber][c] == heightOfBoard)
-								{
-									columnNumberColor[r+lengthOfColumnNumber][c] = 0x01;
-								}
-								else if(columnNumber[r+lengthOfColumnNumber][c] > heightOfBoard/2)
-								{
-									columnNumberColor[r+lengthOfColumnNumber][c] = 0x02;
-								}
-								else if(columnNumber[r+lengthOfColumnNumber][c] > heightOfBoard/3)
-								{
-									columnNumberColor[r+lengthOfColumnNumber][c] = 0x04;
-								}
-								else
-								{
-									columnNumberColor[r+lengthOfColumnNumber][c] = 0x07;
-								}
+								columnNumberIsGrayed[r+lengthOfColumnNumber][c] = !columnNumberIsGrayed[r+lengthOfColumnNumber][c];
 								break;
 							}
 						}
@@ -507,6 +469,7 @@ void PrintBoard(int mode)
 		{
 			if(columnNumber[r][c] < 10) putchar(' ');
 			if(columnNumber[r][c] == 0) putchar(' ');
+			else if(columnNumberIsGrayed[r][c]) ColorNumber(columnNumber[r][c], 0x08);
 			else ColorNumber(columnNumber[r][c], columnNumberColor[r][c]);
 		}
 		printf("\n");
@@ -518,6 +481,7 @@ void PrintBoard(int mode)
 		{
 			if(rowNumber[r][c] < 10) putchar(' ');
 			if(rowNumber[r][c] == 0) putchar(' ');
+			else if(rowNumberIsGrayed[r][c]) ColorNumber(rowNumber[r][c], 0x08);
 			else ColorNumber(rowNumber[r][c], rowNumberColor[r][c]);
 		}
 		for(c=0; c<widthOfBoard; c++)
@@ -584,6 +548,21 @@ void SummonBoard(int seed)
 {
 	int r, c, i, n;
 	srand(seed);
+	// 初始化数字灰化
+	for(r=0; r<heightOfBoard; r++)
+	{
+		for(c=0; c<lengthOfRowNumber; c++)
+		{
+			rowNumberIsGrayed[r][c] = 0;
+		}
+	}
+	for(r=0; r<lengthOfColumnNumber; r++)
+	{
+		for(c=0; c<widthOfBoard; c++)
+		{
+			columnNumberIsGrayed[r][c] = 0;
+		}
+	}
 	while(1)
 	{
 		// 初始化
@@ -592,7 +571,7 @@ void SummonBoard(int seed)
 			for(c=0; c<widthOfBoard; c++)
 			{
 				isMine[r][c] = 0;
-				isOpen[r][c] = 0;
+				isOpen[r][c] = 0;//用于可解性校验
 			}
 		}
 		// 生成雷
@@ -677,7 +656,7 @@ void SummonBoard(int seed)
 				i--;
 			}
 		}
-		// 初始化颜色
+		// 计算数字颜色
 		for(r=0; r<heightOfBoard; r++)
 		{
 			for(c=0; c<lengthOfRowNumber; c++)
@@ -1098,7 +1077,7 @@ void RecoverLine(int r, int c, int mode)//0生成line，1写出
 			lengthOfLine = widthOfBoard;
 			for(i=0; i<lengthOfLine; i++)
 			{
-				lineMine[i] = isMine[r][i];
+				lineMine[i] = isMine[r][i];//仅用于调试
 				lineOpen[i] = isOpen[r][i];
 				lineSolution[i] = 0;
 			}
@@ -1119,7 +1098,6 @@ void RecoverLine(int r, int c, int mode)//0生成line，1写出
 			{
 				if(lineSolution[i] != 0)
 				{
-					solution[r][i] = lineSolution[i];
 					isOpen[r][i] = lineSolution[i];
 				}
 			}
@@ -1153,7 +1131,6 @@ void RecoverLine(int r, int c, int mode)//0生成line，1写出
 			{
 				if(lineSolution[i] != 0)
 				{
-					solution[i][c] = lineSolution[i];
 					isOpen[i][c] = lineSolution[i];
 				}
 			}
@@ -1959,21 +1936,21 @@ int AirWeaveLine(struct LinesIterator li)
 {
 	int i, ni;
 	int* hasFirstSolution =(int*) calloc(countOfLineNumber, sizeof(int));//数字首解存在栈，用于回溯定位
-	int* npos =(int*) calloc(countOfLineNumber, sizeof(int));
+	int* posList =(int*) calloc(countOfLineNumber, sizeof(int));
+	int* mine =(int*) calloc(lengthOfLine, sizeof(int));//临时存储解雷场
 	int* sumMine =(int*) calloc(lengthOfLine, sizeof(int));
 	//生成标准线
 	RecoverLine(li.r, li.c, 0);
 	//遍历所有解
-	int* mine =(int*) calloc(lengthOfLine, sizeof(int));
 	int numberOfPossibility = 0;
-	int t;
+	int t, put;
 	while(1)
 	{
 		//生成下一个解
 		t = 0;
 		while(1)
 		{
-			if(PutNumber(mine, npos[t], lineNumber[t]) == 1)
+			if(PutNumber(mine, posList[t], lineNumber[t]) == 1)
 			{
 				if(t == countOfLineNumber-1)
 				{
@@ -1992,14 +1969,14 @@ int AirWeaveLine(struct LinesIterator li)
 				}
 				else
 				{
-					npos[t+1] = npos[t] + lineNumber[t]+1;
+					posList[t+1] = posList[t] + lineNumber[t]+1;
 					t++;
 				}
 			}
 			else
 			{
-				npos[t]++;
-				if(npos[t] + lineNumber[t] > lengthOfLine)//无解
+				posList[t]++;
+				if(posList[t] + lineNumber[t] > lengthOfLine)//无解
 				{
 					
 				}
@@ -2047,13 +2024,6 @@ int Solve()
 {
 	int r, c;
 	int isSolving = 1;
-	for(r=0; r<heightOfBoard; r++)
-	{
-		for(c=0; c<widthOfBoard; c++)
-		{
-			solution[r][c] = 0;
-		}
-	}
 	while(isSolving)
 	{
 		isSolving = SolveStep();
@@ -2062,7 +2032,7 @@ int Solve()
 	{
 		for(c=0; c<widthOfBoard; c++)
 		{
-			if(isOpen[r][c] == 0 && solution[r][c] == 0) return 0;
+			if(isOpen[r][c] == 0) return 0;
 		}
 	}
 	return 1;
@@ -2116,6 +2086,9 @@ Nonogram 0.8
 ——优化 首末解以位置表代替雷场提升性能
 ——优化 标准线使用固定内存
 ——修复 非法情况端向心分析可能闪退
+Nonogram 0.9
+——优化 不再使用方案矩阵
+——优化 统一数字灰化管理
 //——新增 拖动标记根据起始操作统一标记/取消标记
 //——新增 按空格执行标记校验改为翻开全部未标记方块
 //——新增 首末解交汇分析的间分判断

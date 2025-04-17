@@ -1,8 +1,8 @@
 # Easy Nonogram
 
-内核版本：Nonogram 0.8
+内核版本：Nonogram 0.9
 
-GUI版本：Easy Nonogram 0.7
+GUI版本：Easy Nonogram 0.8
 
 数织，是通过线的提示数字编织符合数字的标记连块的小游戏，标记的对应元素具有地雷的性质，翻开即失败。
 

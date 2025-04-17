@@ -11,7 +11,7 @@
  * 
  * https://github.com/Ltabsyy/Nonogram
  **/
-#define LimLength 24
+#define LimLength 24//为LimHeight和LimWidth的较大值
 #define LimHeight LimLength
 #define LimWidth LimLength
 #define RefreshCycle 50
@@ -20,11 +20,12 @@
 
 int isMine[LimHeight][LimWidth];
 int isOpen[LimHeight][LimWidth];
-int solution[LimHeight][LimWidth];
 int rowNumber[LimHeight][(LimWidth+1)/2];
 int columnNumber[(LimHeight+1)/2][LimWidth];
 color_t rowNumberColor[LimHeight][(LimWidth+1)/2];
 color_t columnNumberColor[(LimHeight+1)/2][LimWidth];
+int rowNumberIsGrayed[LimHeight][(LimWidth+1)/2];
+int columnNumberIsGrayed[(LimHeight+1)/2][LimWidth];
 
 // 标准线
 int lineMine[LimLength];
@@ -37,16 +38,11 @@ int countOfLineNumber;
 int heightOfBoard = 6;
 int widthOfBoard = 6;
 int numberOfMine = 27;
-//int summonCheckMode = 3;
-
 int lengthOfRowNumber = 3;
 int lengthOfColumnNumber = 3;
 
 int sideLength = 32;
-
 int cursorR = InvalidPosition, cursorC = InvalidPosition;
-
-//int debug = 0;
 
 void DrawBlock(int r, int c, int isMine, int isOpen);
 void DrawLineA(int x0, int y0, int r, int angle);
@@ -55,6 +51,7 @@ void DrawWindow(int mode, int mstime, color_t timeColor);
 void DrawTipLine(int r1, int c1, int r2, int c2);
 void InitWindow(int mode);
 void Operate(char operation, int r, int c);
+void OperateLine(char operation, int r1, int c1, int r2, int c2);
 int IsMousePosOutside();
 
 void SummonBoard(int seed);
@@ -70,7 +67,6 @@ void LinesIteratorNext(struct LinesIterator* li);
 int* LineFirstSolutionPosList();
 int* LineLastSolutionPosList();
 int SolveLine(struct LinesIterator li);
-//int AirWeaveLine(struct LinesIterator li);
 int SolveStep();
 int Solve();
 
@@ -89,17 +85,6 @@ int main()
 	xyprintf(0, 2*sideLength, "高级：12*15 - 90");
 	xyprintf(0, 3*sideLength, "专家：15*20 - 148");
 	xyprintf(0, 4*sideLength, "自定义");
-	/*setfont(sideLength*15/16, 0, "黑体");
-	xyprintf(0, 0*sideLength, "初级：");
-	xyprintf(0, 1*sideLength, "中级：");
-	xyprintf(0, 2*sideLength, "高级：");
-	xyprintf(0, 3*sideLength, "专家：");
-	xyprintf(0, 4*sideLength, "自定义");
-	setfont(sideLength, 0, "Consolas");
-	xyprintf(3*sideLength, 0*sideLength, " 6*6  - 27");
-	xyprintf(3*sideLength, 1*sideLength, "10*10 - 64");
-	xyprintf(3*sideLength, 2*sideLength, "12*15 - 90");
-	xyprintf(3*sideLength, 3*sideLength, "15*20 - 148");*/
 	int difficulty = -1;
 	while(difficulty == -1)
 	{
@@ -235,6 +220,26 @@ int main()
 					if(dr > dc && dc <= DragDeviation) c2 = c1;
 					if(dr < dc && dr <= DragDeviation) r2 = r1;
 				}
+				if(r1 == r2)//修正越界拖动
+				{
+					if(r1 >= 0)
+					{
+						if(c1 >= 0 && c2 < 0) c2 = 0;
+						if(c1 < 0 && c2 >= 0) c2 = -1;
+					}
+					if(c2 < -lengthOfRowNumber) c2 = -lengthOfRowNumber;
+					if(c2 >= widthOfBoard) c2 = widthOfBoard-1;
+				}
+				if(c1 == c2)
+				{
+					if(c1 >= 0)
+					{
+						if(r1 >= 0 && r2 < 0) r2 = 0;
+						if(r1 < 0 && r2 >= 0) r2 = -1;
+					}
+					if(r2 < -lengthOfColumnNumber) r2 = -lengthOfColumnNumber;
+					if(r2 >= heightOfBoard) r2 = heightOfBoard-1;
+				}
 			}
 			while(kbmsg())
 			{
@@ -264,44 +269,9 @@ int main()
 					}
 				}
 			}
-			if(operation != 0 && (r1 == r2 || c1 == c2))
-			{
-				if(operation == '#')//根据起点统一标记/取消标记
-				{
-					if(r1>=0 && r1<heightOfBoard && c1>=0 && c1<widthOfBoard)
-					{
-						if(isOpen[r1][c1] == 2) operation = '%';
-					}
-				}
-				if(r1 == r2)
-				{
-					if(c1 > c2)
-					{
-						c = c1;
-						c1 = c2;
-						c2 = c;
-					}
-					for(c=c1; c<=c2; c++)
-					{
-						Operate(operation, r1, c);
-					}
-				}
-				else if(c1 == c2)
-				{
-					if(r1 > r2)
-					{
-						r = r1;
-						r1 = r2;
-						r2 = r;
-					}
-					for(r=r1; r<=r2; r++)
-					{
-						Operate(operation, r, c1);
-					}
-				}
-			}
 			if(operation != 0)
 			{
+				OperateLine(operation, r1, c1, r2, c2);
 				r1 = InvalidPosition;
 				c1 = InvalidPosition;
 				r2 = InvalidPosition;
@@ -480,7 +450,8 @@ void DrawWindow(int mode, int mstime, color_t timeColor)
 		{
 			if(columnNumber[r][c] != 0)
 			{
-				setcolor(columnNumberColor[r][c]);
+				if(columnNumberIsGrayed[r][c]) setcolor(GRAY);
+				else setcolor(columnNumberColor[r][c]);
 				if(columnNumber[r][c] < 10)
 				{
 					xyprintf((lengthOfRowNumber+c)*sideLength+sideLength/4, r*sideLength, "%d", columnNumber[r][c]);
@@ -499,7 +470,8 @@ void DrawWindow(int mode, int mstime, color_t timeColor)
 		{
 			if(rowNumber[r][c] != 0)
 			{
-				setcolor(rowNumberColor[r][c]);
+				if(rowNumberIsGrayed[r][c]) setcolor(GRAY);
+				else setcolor(rowNumberColor[r][c]);
 				if(rowNumber[r][c] < 10)
 				{
 					xyprintf(c*sideLength+sideLength/4, (lengthOfColumnNumber+r)*sideLength, "%d", rowNumber[r][c]);
@@ -682,48 +654,67 @@ void Operate(char operation, int r, int c)
 	}
 	else if(r>=0 && r<heightOfBoard && c < 0)//行数字
 	{
-		if(rowNumberColor[r][c+lengthOfRowNumber] != GRAY)
-		{
-			rowNumberColor[r][c+lengthOfRowNumber] = GRAY;
-		}
-		else if(rowNumber[r][c+lengthOfRowNumber] == widthOfBoard)
-		{
-			rowNumberColor[r][c+lengthOfRowNumber] = DEEPSKYBLUE;
-		}
-		else if(rowNumber[r][c+lengthOfRowNumber] > widthOfBoard/2)
-		{
-			rowNumberColor[r][c+lengthOfRowNumber] = SPRINGGREEN;
-		}
-		else if(rowNumber[r][c+lengthOfRowNumber] > widthOfBoard/3)
-		{
-			rowNumberColor[r][c+lengthOfRowNumber] = LIGHTRED;
-		}
-		else
-		{
-			rowNumberColor[r][c+lengthOfRowNumber] = WHITE;
-		}
+		if(operation == '#' && rowNumberIsGrayed[r][c+lengthOfRowNumber]);
+		else if(operation == '%' && !rowNumberIsGrayed[r][c+lengthOfRowNumber]);
+		else rowNumberIsGrayed[r][c+lengthOfRowNumber] = !rowNumberIsGrayed[r][c+lengthOfRowNumber];
 	}
 	else if(r < 0 && c>=0 && c<widthOfBoard)//列数字
 	{
-		if(columnNumberColor[r+lengthOfColumnNumber][c] != GRAY)
+		if(operation == '#' && columnNumberIsGrayed[r+lengthOfColumnNumber][c]);
+		else if(operation == '%' && !columnNumberIsGrayed[r+lengthOfColumnNumber][c]);
+		else columnNumberIsGrayed[r+lengthOfColumnNumber][c] = !columnNumberIsGrayed[r+lengthOfColumnNumber][c];
+	}
+}
+
+void OperateLine(char operation, int r1, int c1, int r2, int c2)
+{
+	int r, c;
+	if(r1 == r2 || c1 == c2)
+	{
+		if(operation == '#')//根据起点统一标记/取消标记
 		{
-			columnNumberColor[r+lengthOfColumnNumber][c] = GRAY;
+			if(r1>=0 && r1<heightOfBoard && c1>=0 && c1<widthOfBoard)
+			{
+				if(isOpen[r1][c1] == 2) operation = '%';
+			}
 		}
-		else if(columnNumber[r+lengthOfColumnNumber][c] == heightOfBoard)
+		if(r1 < 0 || c1 < 0)//根据起点统一灰化/取消灰化
 		{
-			columnNumberColor[r+lengthOfColumnNumber][c] = DEEPSKYBLUE;
+			operation = '#';//默认灰化
+			if(r1>=0 && r1<heightOfBoard && c1 < 0)//行数字
+			{
+				if(rowNumberIsGrayed[r1][c1+lengthOfRowNumber]) operation = '%';
+			}
+			if(r1 < 0 && c1>=0 && c1<widthOfBoard)//列数字
+			{
+				if(columnNumberIsGrayed[r1+lengthOfColumnNumber][c1]) operation = '%';
+			}
 		}
-		else if(columnNumber[r+lengthOfColumnNumber][c] > heightOfBoard/2)
+		if(r1 == r2)
 		{
-			columnNumberColor[r+lengthOfColumnNumber][c] = SPRINGGREEN;
+			if(c1 > c2)
+			{
+				c = c1;
+				c1 = c2;
+				c2 = c;
+			}
+			for(c=c1; c<=c2; c++)
+			{
+				Operate(operation, r1, c);
+			}
 		}
-		else if(columnNumber[r+lengthOfColumnNumber][c] > heightOfBoard/3)
+		else if(c1 == c2)
 		{
-			columnNumberColor[r+lengthOfColumnNumber][c] = LIGHTRED;
-		}
-		else
-		{
-			columnNumberColor[r+lengthOfColumnNumber][c] = WHITE;
+			if(r1 > r2)
+			{
+				r = r1;
+				r1 = r2;
+				r2 = r;
+			}
+			for(r=r1; r<=r2; r++)
+			{
+				Operate(operation, r, c1);
+			}
 		}
 	}
 }
@@ -746,6 +737,21 @@ void SummonBoard(int seed)
 {
 	int r, c, i, n;
 	srand(seed);
+	// 初始化数字灰化
+	for(r=0; r<heightOfBoard; r++)
+	{
+		for(c=0; c<lengthOfRowNumber; c++)
+		{
+			rowNumberIsGrayed[r][c] = 0;
+		}
+	}
+	for(r=0; r<lengthOfColumnNumber; r++)
+	{
+		for(c=0; c<widthOfBoard; c++)
+		{
+			columnNumberIsGrayed[r][c] = 0;
+		}
+	}
 	while(1)
 	{
 		// 初始化
@@ -754,7 +760,7 @@ void SummonBoard(int seed)
 			for(c=0; c<widthOfBoard; c++)
 			{
 				isMine[r][c] = 0;
-				isOpen[r][c] = 0;
+				isOpen[r][c] = 0;//用于可解性校验
 			}
 		}
 		// 生成雷
@@ -839,7 +845,7 @@ void SummonBoard(int seed)
 				i--;
 			}
 		}
-		// 初始化颜色
+		// 计算数字颜色
 		for(r=0; r<heightOfBoard; r++)
 		{
 			for(c=0; c<lengthOfRowNumber; c++)
@@ -925,7 +931,7 @@ void RecoverLine(int r, int c, int mode)//0生成line，1写出
 			lengthOfLine = widthOfBoard;
 			for(i=0; i<lengthOfLine; i++)
 			{
-				lineMine[i] = isMine[r][i];
+				lineMine[i] = isMine[r][i];//仅用于调试
 				lineOpen[i] = isOpen[r][i];
 				lineSolution[i] = 0;
 			}
@@ -946,7 +952,6 @@ void RecoverLine(int r, int c, int mode)//0生成line，1写出
 			{
 				if(lineSolution[i] != 0)
 				{
-					solution[r][i] = lineSolution[i];
 					isOpen[r][i] = lineSolution[i];
 				}
 			}
@@ -980,7 +985,6 @@ void RecoverLine(int r, int c, int mode)//0生成line，1写出
 			{
 				if(lineSolution[i] != 0)
 				{
-					solution[i][c] = lineSolution[i];
 					isOpen[i][c] = lineSolution[i];
 				}
 			}
@@ -1670,13 +1674,6 @@ int Solve()
 {
 	int r, c;
 	int isSolving = 1;
-	for(r=0; r<heightOfBoard; r++)
-	{
-		for(c=0; c<widthOfBoard; c++)
-		{
-			solution[r][c] = 0;
-		}
-	}
 	while(isSolving)
 	{
 		isSolving = SolveStep();
@@ -1685,7 +1682,7 @@ int Solve()
 	{
 		for(c=0; c<widthOfBoard; c++)
 		{
-			if(isOpen[r][c] == 0 && solution[r][c] == 0) return 0;
+			if(isOpen[r][c] == 0) return 0;
 		}
 	}
 	return 1;
@@ -1726,4 +1723,8 @@ Easy Nonogram 0.7
 ——新增 游戏结束时小于100秒的用时显示小数
 ——优化 过小地图维持数字占用长度至少为2
 ——优化 算法跟随Nonogram 0.8升级
+Easy Nonogram 0.8
+——新增 统一拖动数字灰化
+——优化 拖动操作不再能跨越数字和方块
+——优化 算法跟随Nonogram 0.9升级
 --------------------------------*/
