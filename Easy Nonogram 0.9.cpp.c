@@ -149,7 +149,7 @@ int main()
 		inputbox_getline("自定义难度输入框",
 			"[行数] [列数] [雷数]\n注意空格，输入后回车。\n"
 			"最大地图24*24，某些难度可能难以生成可解地图。\n"
-			"什么？输入框太丑？请到https://github.com/wysaid/xege反馈！", str, 64);
+			"什么？输入框太丑？请到https://github.com/x-ege/xege反馈！", str, 64);
 		sscanf(str, "%d%d%d", &heightOfBoard, &widthOfBoard, &numberOfMine);
 		if(heightOfBoard < 1) heightOfBoard = 1;
 		if(heightOfBoard > LimHeight) heightOfBoard = LimHeight;
@@ -634,7 +634,7 @@ void InitWindow(int mode)
 	else
 	{
 		while((widthOfBoard+lengthOfRowNumber)*sideLength > screenWidth
-			|| (heightOfBoard+lengthOfColumnNumber+3)*sideLength > screenHeight)
+			|| (heightOfBoard+lengthOfColumnNumber)*sideLength > screenHeight*10/11)
 		{
 			sideLength -= 4;
 		}
@@ -1727,4 +1727,6 @@ Easy Nonogram 0.8
 ——新增 统一拖动数字灰化
 ——优化 拖动操作不再能跨越数字和方块
 ——优化 算法跟随Nonogram 0.9升级
+Easy Nonogram 0.9
+——优化 默认显示大小
 --------------------------------*/
