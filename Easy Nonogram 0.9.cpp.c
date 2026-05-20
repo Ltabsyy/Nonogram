@@ -63,6 +63,7 @@ struct LinesIterator//标准线组迭代器
 };
 struct LinesIterator LinesIteratorBegin();
 int IsLinesIteratorEnd(struct LinesIterator li);
+int IsLinesIteratorSolved(struct LinesIterator li);
 void LinesIteratorNext(struct LinesIterator* li);
 int* LineFirstSolutionPosList();
 int* LineLastSolutionPosList();
@@ -1005,6 +1006,25 @@ int IsLinesIteratorEnd(struct LinesIterator li)//判断超尾
 	return li.r == -1 && li.c == -1;
 }
 
+int IsLinesIteratorSolved(struct LinesIterator li)
+{
+	if(li.r != -1 && li.c == -1)
+	{
+		for(int c=0; c<widthOfBoard; c++)
+		{
+			if(isOpen[li.r][c] == 0) return 0;
+		}
+	}
+	else if(li.r == -1 && li.c != -1)
+	{
+		for(int r=0; r<heightOfBoard; r++)
+		{
+			if(isOpen[r][li.c] == 0) return 0;
+		}
+	}
+	return 1;
+}
+
 void LinesIteratorNext(struct LinesIterator* li)
 {
 	if(li->r != -1 && li->c == -1)
@@ -1665,6 +1685,7 @@ int SolveStep()
 	struct LinesIterator li;
 	for(li = LinesIteratorBegin(); !IsLinesIteratorEnd(li); LinesIteratorNext(&li))//通过标准线组迭代器遍历
 	{
+		if(IsLinesIteratorSolved(li)) continue;//跳过已解线
 		isSolving += SolveLine(li);
 	}
 	return isSolving != 0;
@@ -1729,4 +1750,5 @@ Easy Nonogram 0.8
 ——优化 算法跟随Nonogram 0.9升级
 Easy Nonogram 0.9
 ——优化 默认显示大小
+——优化 算法跟随Nonogram 0.10升级
 --------------------------------*/

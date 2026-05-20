@@ -46,6 +46,7 @@ struct LinesIterator//标准线组迭代器
 };
 struct LinesIterator LinesIteratorBegin();
 int IsLinesIteratorEnd(struct LinesIterator li);
+int IsLinesIteratorSolved(struct LinesIterator li);
 void LinesIteratorNext(struct LinesIterator* li);
 //int PutNumber(int* mine, int pos, int number);
 int* LineFirstSolutionPosList();
@@ -1151,6 +1152,44 @@ int IsLinesIteratorEnd(struct LinesIterator li)//判断超尾
 	return li.r == -1 && li.c == -1;
 }
 
+int IsLinesIteratorSolved(struct LinesIterator li)
+{
+	if(li.r != -1 && li.c == -1)
+	{
+		for(int c=0; c<widthOfBoard; c++)
+		{
+			if(isOpen[li.r][c] == 0) return 0;
+		}
+	}
+	else if(li.r == -1 && li.c != -1)
+	{
+		for(int r=0; r<heightOfBoard; r++)
+		{
+			if(isOpen[r][li.c] == 0) return 0;
+		}
+	}
+	return 1;
+}
+/*
+int IsLinesIteratorNeverSolved(struct LinesIterator li)
+{
+	if(li.r != -1 && li.c == -1)
+	{
+		for(int c=0; c<widthOfBoard; c++)
+		{
+			if(isOpen[li.r][c] != 0) return 0;
+		}
+	}
+	else if(li.r == -1 && li.c != -1)
+	{
+		for(int r=0; r<heightOfBoard; r++)
+		{
+			if(isOpen[r][li.c] != 0) return 0;
+		}
+	}
+	return 1;
+}
+*/
 void LinesIteratorNext(struct LinesIterator* li)
 {
 	if(li->r != -1 && li->c == -1)
@@ -1932,73 +1971,75 @@ int SolveLine(struct LinesIterator li)
 	return 0;
 }
 /*
-int AirWeaveLine(struct LinesIterator li)
+void EnumLineRecursion(int ni, int pos, int* mine, int* sumMine, int* numberOfPossibility)
 {
-	int i, ni;
-	int* hasFirstSolution =(int*) calloc(countOfLineNumber, sizeof(int));//数字首解存在栈，用于回溯定位
-	int* posList =(int*) calloc(countOfLineNumber, sizeof(int));
-	int* mine =(int*) calloc(lengthOfLine, sizeof(int));//临时存储解雷场
-	int* sumMine =(int*) calloc(lengthOfLine, sizeof(int));
-	//生成标准线
-	RecoverLine(li.r, li.c, 0);
-	//遍历所有解
-	int numberOfPossibility = 0;
-	int t, put;
-	while(1)
+	int i;
+	if(ni == countOfLineNumber)
 	{
-		//生成下一个解
-		t = 0;
-		while(1)
+		//检查剩余方块无标记
+		for(i=pos; i<lengthOfLine; i++)
 		{
-			if(PutNumber(mine, posList[t], lineNumber[t]) == 1)
-			{
-				if(t == countOfLineNumber-1)
-				{
-					//检查剩余方块无标记
-					
-					//写入和字典
-					numberOfPossibility++;
-					for(i=0; i<lengthOfLine; i++)
-					{
-						sumMine[i] += mine[i];
-					}
-					for(i=0; i<countOfLineNumber; i++)
-					{
-						hasFirstSolution[i] = 1;
-					}
-				}
-				else
-				{
-					posList[t+1] = posList[t] + lineNumber[t]+1;
-					t++;
-				}
-			}
-			else
-			{
-				posList[t]++;
-				if(posList[t] + lineNumber[t] > lengthOfLine)//无解
-				{
-					
-				}
-			}
+			if(lineOpen[i] == 2) return;
 		}
-		
+		//写入和字典
+		(*numberOfPossibility)++;
 		for(i=0; i<lengthOfLine; i++)
 		{
 			sumMine[i] += mine[i];
-			mine[i] = 0;
 		}
+		return;
 	}
-	
-	//标准线解写出
-	RecoverLine(li.r, li.c, 1);
-	free(hasFirstSolution);
-	//返回是否存在解
-	for(i=0; i<lengthOfLine; i++)
+	while(pos + lineNumber[ni] <= lengthOfLine)
 	{
-		if(lineSolution[i] != 0) return 1;
+		int len = countOfLineNumber-ni-1;
+		for(int n=ni; n<countOfLineNumber; n++) len += lineNumber[n];
+		if(pos + len > lengthOfLine) return;//不能容纳剩余数字的最小长度则剪枝
+		if(PutNumber(mine, pos, lineNumber[ni]))
+		{
+			EnumLineRecursion(ni+1, pos+lineNumber[ni]+1, mine, sumMine, numberOfPossibility);
+			for(i=pos; i<pos+lineNumber[ni]; i++)
+			{
+				mine[i] = 0;//回溯
+			}
+		}
+		if(lineOpen[pos] == 2) break;//不能跳过标记
+		pos++;
 	}
-	return 0;
+}
+
+int AirWeaveLine(struct LinesIterator li)
+{
+	int i;
+	int numberOfPossibility = 0;
+	int hasSolution = 0;
+	int mine[LimLength]={0};//临时存储解雷场
+	int sumMine[LimLength]={0};
+	//生成标准线
+	RecoverLine(li.r, li.c, 0);
+	//遍历所有解
+	EnumLineRecursion(0, 0, mine, sumMine, &numberOfPossibility);
+	//和字典确定部分转为解
+	if(numberOfPossibility > 0)
+	{
+		for(i=0; i<lengthOfLine; i++)
+		{
+			if(lineOpen[i] == 0)
+			{
+				if(sumMine[i] == 0)
+				{
+					lineSolution[i] = 1;
+					hasSolution = 1;
+				}
+				else if(sumMine[i] == numberOfPossibility)
+				{
+					lineSolution[i] = 2;
+					hasSolution = 1;
+				}
+			}
+		}
+		if(hasSolution) RecoverLine(li.r, li.c, 1);//标准线解写出
+	}
+	return hasSolution;//返回是否存在解
 }
 */
 int SolveStep()
@@ -2007,12 +2048,15 @@ int SolveStep()
 	struct LinesIterator li;
 	for(li = LinesIteratorBegin(); !IsLinesIteratorEnd(li); LinesIteratorNext(&li))//通过标准线组迭代器遍历
 	{
+		if(IsLinesIteratorSolved(li)) continue;//跳过已解线
 		isSolving += SolveLine(li);
 	}
 	/*if(isSolving == 0)
 	{
 		for(li = LinesIteratorBegin(); !IsLinesIteratorEnd(li); LinesIteratorNext(&li))
 		{
+			if(IsLinesIteratorSolved(li)) continue;
+			if(IsLinesIteratorNeverSolved(li)) continue;//跳过无任何操作的线，因只存在首末解交汇解
 			isSolving += AirWeaveLine(li);
 		}
 	}*/
@@ -2089,6 +2133,8 @@ Nonogram 0.8
 Nonogram 0.9
 ——优化 不再使用方案矩阵
 ——优化 统一数字灰化管理
+Nonogram 0.10
+——优化 通过跳过已解线提升性能
 //——新增 拖动标记根据起始操作统一标记/取消标记
 //——新增 按空格执行标记校验改为翻开全部未标记方块
 //——新增 首末解交汇分析的间分判断
