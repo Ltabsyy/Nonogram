@@ -4,6 +4,7 @@
 #include <time.h>
 #include <math.h>
 #include <graphics.h>//链接参数-mwindows
+#include <ege/sys_edit.h>
 /**
  * 数织 Easy Nonogram
  *
@@ -80,22 +81,41 @@ int main()
 	int r1 = InvalidPosition, c1 = InvalidPosition, r2 = InvalidPosition, c2 = InvalidPosition;
 	// 设置难度
 	InitWindow(0);
-	setcolor(WHITE);
-	xyprintf(0, 0*sideLength, "初级： 6*6  - 27");
-	xyprintf(0, 1*sideLength, "中级：10*10 - 64");
-	xyprintf(0, 2*sideLength, "高级：12*15 - 90");
-	xyprintf(0, 3*sideLength, "专家：15*20 - 148");
-	xyprintf(0, 4*sideLength, "自定义");
-	int difficulty = -1;
+	int difficulty = -1, highlight = 0;
 	while(difficulty == -1)
 	{
+		cleardevice();
+		setcolor(RED);
+		setlinewidth(sideLength/16);
+		ege_ellipse(sideLength/4, sideLength/4, sideLength/2, sideLength/2);
+		setfont(sideLength, 0, "Consolas");
+		setcolor(WHITE);
+		xyprintf(sideLength*1, sideLength*0, "Easy Nonogram");
+		setfont(sideLength*3/4, 0, "黑体");
+		xyprintf(sideLength*1, sideLength*1+sideLength/8, "初级：");
+		xyprintf(sideLength*1, sideLength*2+sideLength/8, "中级：");
+		xyprintf(sideLength*1, sideLength*3+sideLength/8, "高级：");
+		xyprintf(sideLength*1, sideLength*4+sideLength/8, "专家：");
+		xyprintf(sideLength*3, sideLength*5+sideLength/8, "自定义");
+		setfont(sideLength*3/4, 0, "Consolas");
+		xyprintf(sideLength*3, sideLength*1+sideLength/8, "  6*6  - 27");
+		xyprintf(sideLength*3, sideLength*2+sideLength/8, " 10*10 - 64");
+		xyprintf(sideLength*3, sideLength*3+sideLength/8, " 12*15 - 90");
+		xyprintf(sideLength*3, sideLength*4+sideLength/8, " 15*20 - 148");
+		if(highlight)
+		{
+			setfillcolor(EGERGBA(0xff, 0xff, 0xff, 0x10));
+			ege_fillrect(0, sideLength*highlight, sideLength*8, sideLength);
+		}
 		while(mousemsg())
 		{
 			mouseMsg = getmouse();
 			if(mouseMsg.is_up())
 			{
-				difficulty = mouseMsg.y/sideLength+1;
+				difficulty = mouseMsg.y/sideLength;
 			}
+			highlight = mouseMsg.y/sideLength;
+			if(highlight < 1 || highlight > 5) highlight = 0;
 		}
 		while(kbmsg())
 		{
@@ -143,14 +163,37 @@ int main()
 		widthOfBoard = 20;
 		numberOfMine = 148;
 	}
-	else
+	else//自定义难度输入框界面
 	{
-		char str[64];
-		resizewindow(13*32, 10*32);
-		inputbox_getline("自定义难度输入框",
-			"[行数] [列数] [雷数]\n注意空格，输入后回车。\n"
-			"最大地图24*24，某些难度可能难以生成可解地图。\n"
-			"什么？输入框太丑？请到https://github.com/x-ege/xege反馈！", str, 64);
+		char str[16];
+		cleardevice();
+		setcolor(RED);
+		setlinewidth(sideLength/16);
+		ege_ellipse(sideLength/4, sideLength/4, sideLength/2, sideLength/2);
+		setfont(sideLength, 0, "Consolas");
+		setcolor(WHITE);
+		xyprintf(sideLength*1, sideLength*0, "Easy Nonogram");
+		setfont(sideLength*5/8, 0, "黑体");
+		outtextrect(sideLength/2, sideLength*1+sideLength/8, sideLength*8-sideLength/2, sideLength*6,
+			"自定义难度输入框\n[行数] [列数] [雷数]\n注意空格，输入后回车。\n"
+			"最大地图24*24，某些难度可能难以生成可解地图。\n");
+		sys_edit edit;
+		edit.create(0);//单行文本框
+		edit.move(0, sideLength*5-8);
+		edit.size(sideLength*8, sideLength+8);
+		edit.setbgcolor(WHITE);
+		edit.setcolor(BLACK);
+		edit.setfont(sideLength, 0, "Consolas");
+		edit.setmaxlen(16);
+		edit.visible(1);
+		edit.setfocus();//聚焦，无需点击后输入
+		while(1)
+		{
+			if(kbmsg()) keyMsg = getkey();
+			if(keyMsg.msg == key_msg_up && keyMsg.key == key_enter) break;//会响铃，问题不大(doge)
+			delay_ms(RefreshCycle);
+		}
+		edit.gettext(16, str);
 		sscanf(str, "%d%d%d", &heightOfBoard, &widthOfBoard, &numberOfMine);
 		if(heightOfBoard < 1) heightOfBoard = 1;
 		if(heightOfBoard > LimHeight) heightOfBoard = LimHeight;
@@ -626,7 +669,7 @@ void InitWindow(int mode)
 		else sideLength = 24;
 		setcaption("Easy Nonogram");
 		SetProcessDPIAware();//避免Windows缩放造成模糊
-		initgraph(10*sideLength, 5*sideLength, INIT_RENDERMANUAL);
+		initgraph(8*sideLength, 6*sideLength, INIT_RENDERMANUAL);
 		setbkcolor(EGERGB(18, 18, 18));
 		setfont(sideLength, 0, "Consolas");
 		setbkmode(TRANSPARENT);
@@ -1749,6 +1792,7 @@ Easy Nonogram 0.8
 ——优化 拖动操作不再能跨越数字和方块
 ——优化 算法跟随Nonogram 0.9升级
 Easy Nonogram 0.9
+——新增 引入sys_edit文本框，重构启动界面
 ——优化 默认显示大小
 ——优化 算法跟随Nonogram 0.10升级
 --------------------------------*/
