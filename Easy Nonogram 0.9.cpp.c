@@ -15,7 +15,7 @@
 #define LimLength 24//为LimHeight和LimWidth的较大值
 #define LimHeight LimLength
 #define LimWidth LimLength
-#define RefreshCycle 50
+#define RefreshCycle 25
 #define DragDeviation 1
 #define InvalidPosition -2147483648
 
@@ -44,6 +44,7 @@ int lengthOfColumnNumber = 3;
 
 int sideLength = 32;
 int cursorR = InvalidPosition, cursorC = InvalidPosition;
+int separate = 3;//辅助线间距，0无，在0,1,3,5切换
 
 void DrawBlock(int r, int c, int isMine, int isOpen);
 void DrawLineA(int x0, int y0, int r, int angle);
@@ -53,6 +54,7 @@ void DrawTipLine(int r1, int c1, int r2, int c2);
 void InitWindow(int mode);
 void Operate(char operation, int r, int c);
 void OperateLine(char operation, int r1, int c1, int r2, int c2);
+void ChangeSeparator();
 int IsMousePosOutside();
 
 void SummonBoard(int seed);
@@ -64,7 +66,6 @@ struct LinesIterator//标准线组迭代器
 };
 struct LinesIterator LinesIteratorBegin();
 int IsLinesIteratorEnd(struct LinesIterator li);
-int IsLinesIteratorSolved(struct LinesIterator li);
 void LinesIteratorNext(struct LinesIterator* li);
 int* LineFirstSolutionPosList();
 int* LineLastSolutionPosList();
@@ -166,6 +167,7 @@ int main()
 	else//自定义难度输入框界面
 	{
 		char str[16];
+		char text[256];
 		cleardevice();
 		setcolor(RED);
 		setlinewidth(sideLength/16);
@@ -174,15 +176,15 @@ int main()
 		setcolor(WHITE);
 		xyprintf(sideLength*1, sideLength*0, "Easy Nonogram");
 		setfont(sideLength*5/8, 0, "黑体");
-		outtextrect(sideLength/2, sideLength*1+sideLength/8, sideLength*8-sideLength/2, sideLength*6,
-			"自定义难度输入框\n[行数] [列数] [雷数]\n注意空格，输入后回车。\n"
-			"最大地图24*24，某些难度可能难以生成可解地图。\n");
+		sprintf(text, "自定义难度输入框\n[行数] [列数] [雷数]\n注意空格，输入后回车。\n"
+			"最大地图%d*%d，某些难度可能难以生成可解地图。\n", LimHeight, LimWidth);
+		outtextrect(sideLength/2, sideLength*1+sideLength/8, sideLength*8-sideLength/2, sideLength*6, text);
 		sys_edit edit;
 		edit.create(0);//单行文本框
 		edit.move(0, sideLength*5-8);
 		edit.size(sideLength*8, sideLength+8);
-		edit.setbgcolor(WHITE);
-		edit.setcolor(BLACK);
+		//edit.setbgcolor(WHITE);
+		//edit.setcolor(BLACK);
 		edit.setfont(sideLength, 0, "Consolas");
 		edit.setmaxlen(16);
 		edit.visible(1);
@@ -311,6 +313,10 @@ int main()
 					{
 						SolveStep();
 					}
+					else if(keyMsg.key == 'L')
+					{
+						ChangeSeparator();
+					}
 				}
 			}
 			if(operation != 0)
@@ -394,10 +400,15 @@ int main()
 				{
 					if(keyMsg.key == 'R') newGame = 1;
 				}
+				else if(keyMsg.key == 'L')
+				{
+					ChangeSeparator();
+				}
 			}
 			delay_ms(RefreshCycle);
 		}
 	}
+	closegraph();
 	return 0;
 }
 
@@ -553,16 +564,18 @@ void DrawWindow(int mode, int mstime, color_t timeColor)
 			}
 		}
 	}
-	//临时辅助线
+	//辅助线
 	setcolor(GRAY);
 	setlinewidth(sideLength/32);
-	for(r=0; r<heightOfBoard; r+=3)
+	for(r=0; r<heightOfBoard; r+=separate)
 	{
 		line(0, (lengthOfColumnNumber+r)*sideLength, (lengthOfRowNumber+widthOfBoard)*sideLength, (lengthOfColumnNumber+r)*sideLength);
+		if(separate <= 0) break;//只画数字和地图的分隔线
 	}
-	for(c=0; c<widthOfBoard; c+=3)
+	for(c=0; c<widthOfBoard; c+=separate)
 	{
 		line((lengthOfRowNumber+c)*sideLength, 0, (lengthOfRowNumber+c)*sideLength, (lengthOfColumnNumber+heightOfBoard)*sideLength);
+		if(separate <= 0) break;
 	}
 	//剩余雷数
 	int remainder = numberOfMine;
@@ -761,6 +774,15 @@ void OperateLine(char operation, int r1, int c1, int r2, int c2)
 			}
 		}
 	}
+}
+
+void ChangeSeparator()
+{
+	if(separate == 0) separate = 1;
+	else if(separate == 1) separate = 3;
+	else if(separate == 3) separate = 5;
+	else if(separate == 5) separate = 0;
+	else separate = 3;
 }
 
 int IsMousePosOutside()//鼠标在窗口边界外
@@ -1722,34 +1744,132 @@ int SolveLine(struct LinesIterator li)
 	return 0;
 }
 
-int SolveStep()
+int SolveStep()//按Tab执行的单步求解
 {
 	int isSolving = 0;
 	struct LinesIterator li;
 	for(li = LinesIteratorBegin(); !IsLinesIteratorEnd(li); LinesIteratorNext(&li))//通过标准线组迭代器遍历
 	{
-		if(IsLinesIteratorSolved(li)) continue;//跳过已解线
 		isSolving += SolveLine(li);
 	}
 	return isSolving != 0;
 }
 
-int Solve()
+int Solve()//生成可解地图等从头开始的地图求解
 {
 	int r, c;
-	int isSolving = 1;
-	while(isSolving)
+	int isSolving = 0, isSolved;
+	int rowChanged[LimHeight]={0};//关注变化部分
+	int columnChanged[LimWidth]={0};
+	int lastOpenR[LimHeight][LimWidth]={0};//行列缓存分开
+	int lastOpenC[LimHeight][LimWidth]={0};
+	struct LinesIterator li;
+	//首次简单求解
+	for(li = LinesIteratorBegin(); !IsLinesIteratorEnd(li); LinesIteratorNext(&li))
 	{
-		isSolving = SolveStep();
+		isSolving += SolveLine(li);
 	}
+	//首次更新变化
 	for(r=0; r<heightOfBoard; r++)
 	{
 		for(c=0; c<widthOfBoard; c++)
 		{
-			if(isOpen[r][c] == 0) return 0;
+			if(isOpen[r][c] != lastOpenR[r][c])
+			{
+				rowChanged[r] = 1;
+				columnChanged[c] = 1;
+				lastOpenR[r][c] = isOpen[r][c];
+				lastOpenC[r][c] = isOpen[r][c];
+			}
 		}
 	}
-	return 1;
+	while(isSolving)
+	{
+		//判断解完
+		for(r=0; r<heightOfBoard; r++)//行计算解完
+		{
+			if(rowChanged[r] == 1)
+			{
+				isSolved = 1;
+				for(c=0; c<widthOfBoard; c++)
+				{
+					if(isOpen[r][c] == 0)
+					{
+						isSolved = 0;
+						break;
+					}
+				}
+				if(isSolved) rowChanged[r] = 2;
+			}
+		}
+		for(c=0; c<widthOfBoard; c++)//列计算解完
+		{
+			if(columnChanged[c] == 1)
+			{
+				isSolved = 1;
+				for(r=0; r<heightOfBoard; r++)
+				{
+					if(isOpen[r][c] == 0)
+					{
+						isSolved = 0;
+						break;
+					}
+				}
+				if(isSolved) columnChanged[c] = 2;
+			}
+		}
+		isSolved = 1;
+		for(r=0; r<heightOfBoard; r++)//全解完判断
+		{
+			if(rowChanged[r] != 2)
+			{
+				isSolved = 0;
+				break;
+			}
+		}
+		if(isSolved) return 1;
+		//在有变化的线上求解
+		isSolving = 0;
+		for(li = LinesIteratorBegin(); li.c == -1; LinesIteratorNext(&li))//行遍历
+		{
+			if(rowChanged[li.r] == 1)
+			{
+				isSolving += SolveLine(li);
+				rowChanged[li.r] = 0;
+			}
+		}
+		for(r=0; r<heightOfBoard; r++)//列信息更新
+		{
+			for(c=0; c<widthOfBoard; c++)
+			{
+				if(isOpen[r][c] != lastOpenC[r][c])
+				{
+					columnChanged[c] = 1;
+					lastOpenC[r][c] = isOpen[r][c];
+				}
+			}
+		}
+		for(; !IsLinesIteratorEnd(li); LinesIteratorNext(&li))//列遍历
+		{
+			if(columnChanged[li.c] == 1)
+			{
+				isSolving += SolveLine(li);
+				columnChanged[li.c] = 0;
+			}
+		}
+		for(r=0; r<heightOfBoard; r++)//行信息更新
+		{
+			for(c=0; c<widthOfBoard; c++)
+			{
+				if(isOpen[r][c] != lastOpenR[r][c])
+				{
+					rowChanged[r] = 1;
+					lastOpenR[r][c] = isOpen[r][c];
+				}
+			}
+		}
+	}
+	return 0;//首次无解或未解完时无解
 }
 
 /*--------------------------------
@@ -1793,6 +1913,9 @@ Easy Nonogram 0.8
 ——优化 算法跟随Nonogram 0.9升级
 Easy Nonogram 0.9
 ——新增 引入sys_edit文本框，重构启动界面
+——新增 按L切换辅助线
 ——优化 默认显示大小
+——优化 刷新率从20Hz提高到40Hz
 ——优化 算法跟随Nonogram 0.10升级
+//——优化 编译体积（使用新版EGE，自研EGE模块分离）
 --------------------------------*/

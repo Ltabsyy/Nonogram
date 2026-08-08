@@ -46,7 +46,7 @@ struct LinesIterator//标准线组迭代器
 };
 struct LinesIterator LinesIteratorBegin();
 int IsLinesIteratorEnd(struct LinesIterator li);
-int IsLinesIteratorSolved(struct LinesIterator li);
+//int IsLinesIteratorSolved(struct LinesIterator li);
 void LinesIteratorNext(struct LinesIterator* li);
 //int PutNumber(int* mine, int pos, int number);
 int* LineFirstSolutionPosList();
@@ -401,6 +401,7 @@ int main()
 		else if(choiceMode == 7)//随机求解测试
 		{
 			int n, i;
+			int count[2][3] = {0};
 			srand(0);
 			t0 = time(0);
 			for(seed=0; seed<10000000; seed++)
@@ -413,7 +414,9 @@ int main()
 					isOpen[0][c] = n%6%3;
 					n/=6;*/
 					isMine[0][c] = rand()%2;
-					isOpen[0][c] = rand()%3;
+					//isOpen[0][c] = rand()%3;//包含错误条件
+					if(isMine[0][c]) isOpen[0][c] = rand()%2*2;
+					else isOpen[0][c] = rand()%2;//不包含
 				}
 				for(c=0; c<lengthOfRowNumber; c++)
 				{
@@ -444,9 +447,15 @@ int main()
 					i--;
 				}
 				SolveLine(LinesIteratorBegin());
+				//AirWeaveLine(LinesIteratorBegin());
+				for(c=0; c<widthOfBoard; c++)
+				{
+					count[isMine[0][c]][isOpen[0][c]]++;
+				}
 			}
 			printf("\r%d\n", seed-1);
 			printf("稳定性通过！标准线长：%d 用时：%d\n", lengthOfLine, time(0)-t0);
+			printf("正确翻开%d 正确标记%d 翻开雷%d 错误标记%d\n", count[0][1], count[1][2], count[1][1], count[0][2]);
 		}
 		else// if(choiceMode == 3)
 		{
@@ -1151,7 +1160,7 @@ int IsLinesIteratorEnd(struct LinesIterator li)//判断超尾
 {
 	return li.r == -1 && li.c == -1;
 }
-
+/*
 int IsLinesIteratorSolved(struct LinesIterator li)
 {
 	if(li.r != -1 && li.c == -1)
@@ -1170,7 +1179,7 @@ int IsLinesIteratorSolved(struct LinesIterator li)
 	}
 	return 1;
 }
-/*
+
 int IsLinesIteratorNeverSolved(struct LinesIterator li)
 {
 	if(li.r != -1 && li.c == -1)
@@ -2042,13 +2051,13 @@ int AirWeaveLine(struct LinesIterator li)
 	return hasSolution;//返回是否存在解
 }
 */
-int SolveStep()
+int SolveStep()//按Tab执行的单步求解
 {
 	int isSolving = 0;
 	struct LinesIterator li;
 	for(li = LinesIteratorBegin(); !IsLinesIteratorEnd(li); LinesIteratorNext(&li))//通过标准线组迭代器遍历
 	{
-		if(IsLinesIteratorSolved(li)) continue;//跳过已解线
+		//if(IsLinesIteratorSolved(li)) continue;//跳过已解线
 		isSolving += SolveLine(li);
 	}
 	/*if(isSolving == 0)
@@ -2060,26 +2069,127 @@ int SolveStep()
 			isSolving += AirWeaveLine(li);
 		}
 	}*/
-	countStep++;
+	//countStep++;
 	return isSolving != 0;
 }
 
-int Solve()
+int Solve()//生成可解地图等从头开始的地图求解
 {
 	int r, c;
-	int isSolving = 1;
-	while(isSolving)
+	int isSolving = 0, isSolved;
+	int rowChanged[LimHeight]={0};//关注变化部分
+	int columnChanged[LimWidth]={0};
+	int lastOpenR[LimHeight][LimWidth]={0};//行列缓存分开
+	int lastOpenC[LimHeight][LimWidth]={0};
+	struct LinesIterator li;
+	//首次简单求解
+	for(li = LinesIteratorBegin(); !IsLinesIteratorEnd(li); LinesIteratorNext(&li))
 	{
-		isSolving = SolveStep();
+		isSolving += SolveLine(li);
 	}
+	//首次更新变化
 	for(r=0; r<heightOfBoard; r++)
 	{
 		for(c=0; c<widthOfBoard; c++)
 		{
-			if(isOpen[r][c] == 0) return 0;
+			if(isOpen[r][c] != lastOpenR[r][c])
+			{
+				rowChanged[r] = 1;
+				columnChanged[c] = 1;
+				lastOpenR[r][c] = isOpen[r][c];
+				lastOpenC[r][c] = isOpen[r][c];
+			}
 		}
 	}
-	return 1;
+	countStep++;
+	while(isSolving)
+	{
+		//判断解完
+		for(r=0; r<heightOfBoard; r++)//行计算解完
+		{
+			if(rowChanged[r] == 1)
+			{
+				isSolved = 1;
+				for(c=0; c<widthOfBoard; c++)
+				{
+					if(isOpen[r][c] == 0)
+					{
+						isSolved = 0;
+						break;
+					}
+				}
+				if(isSolved) rowChanged[r] = 2;
+			}
+		}
+		for(c=0; c<widthOfBoard; c++)//列计算解完
+		{
+			if(columnChanged[c] == 1)
+			{
+				isSolved = 1;
+				for(r=0; r<heightOfBoard; r++)
+				{
+					if(isOpen[r][c] == 0)
+					{
+						isSolved = 0;
+						break;
+					}
+				}
+				if(isSolved) columnChanged[c] = 2;
+			}
+		}
+		isSolved = 1;
+		for(r=0; r<heightOfBoard; r++)//全解完判断
+		{
+			if(rowChanged[r] != 2)
+			{
+				isSolved = 0;
+				break;
+			}
+		}
+		if(isSolved) return 1;
+		//在有变化的线上求解
+		isSolving = 0;
+		for(li = LinesIteratorBegin(); li.c == -1; LinesIteratorNext(&li))//行遍历
+		{
+			if(rowChanged[li.r] == 1)
+			{
+				isSolving += SolveLine(li);
+				rowChanged[li.r] = 0;
+			}
+		}
+		for(r=0; r<heightOfBoard; r++)//列信息更新
+		{
+			for(c=0; c<widthOfBoard; c++)
+			{
+				if(isOpen[r][c] != lastOpenC[r][c])
+				{
+					columnChanged[c] = 1;
+					lastOpenC[r][c] = isOpen[r][c];
+				}
+			}
+		}
+		for(; !IsLinesIteratorEnd(li); LinesIteratorNext(&li))//列遍历
+		{
+			if(columnChanged[li.c] == 1)
+			{
+				isSolving += SolveLine(li);
+				columnChanged[li.c] = 0;
+			}
+		}
+		for(r=0; r<heightOfBoard; r++)//行信息更新
+		{
+			for(c=0; c<widthOfBoard; c++)
+			{
+				if(isOpen[r][c] != lastOpenR[r][c])
+				{
+					rowChanged[r] = 1;
+					lastOpenR[r][c] = isOpen[r][c];
+				}
+			}
+		}
+		countStep++;
+	}
+	return 0;//首次无解或未解完时无解
 }
 
 /*--------------------------------
@@ -2134,7 +2244,7 @@ Nonogram 0.9
 ——优化 不再使用方案矩阵
 ——优化 统一数字灰化管理
 Nonogram 0.10
-——优化 通过跳过已解线提升性能
+——优化 通过注意变化机制提升性能
 //——新增 拖动标记根据起始操作统一标记/取消标记
 //——新增 按空格执行标记校验改为翻开全部未标记方块
 //——新增 首末解交汇分析的间分判断
