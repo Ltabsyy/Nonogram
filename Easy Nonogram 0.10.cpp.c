@@ -3,8 +3,8 @@
 #include <stdlib.h>
 #include <time.h>
 #include <math.h>
-#include <graphics.h>//链接参数-mwindows
-#include <ege/sys_edit.h>
+#include "graphics.h"//链接参数-mwindows
+#include "ege/sys_edit.h"
 /**
  * 数织 Easy Nonogram
  *
@@ -1071,25 +1071,6 @@ int IsLinesIteratorEnd(struct LinesIterator li)//判断超尾
 	return li.r == -1 && li.c == -1;
 }
 
-int IsLinesIteratorSolved(struct LinesIterator li)
-{
-	if(li.r != -1 && li.c == -1)
-	{
-		for(int c=0; c<widthOfBoard; c++)
-		{
-			if(isOpen[li.r][c] == 0) return 0;
-		}
-	}
-	else if(li.r == -1 && li.c != -1)
-	{
-		for(int r=0; r<heightOfBoard; r++)
-		{
-			if(isOpen[r][li.c] == 0) return 0;
-		}
-	}
-	return 1;
-}
-
 void LinesIteratorNext(struct LinesIterator* li)
 {
 	if(li->r != -1 && li->c == -1)
@@ -1917,5 +1898,7 @@ Easy Nonogram 0.9
 ——优化 默认显示大小
 ——优化 刷新率从20Hz提高到40Hz
 ——优化 算法跟随Nonogram 0.10升级
-//——优化 编译体积（使用新版EGE，自研EGE模块分离）
+Easy Nonogram 0.10
+——优化 编译体积（使用新版EGE，自研EGE模块分离）
+——优化 sys_edit回车不再响铃（自研EGE）
 --------------------------------*/
