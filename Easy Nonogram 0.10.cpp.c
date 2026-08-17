@@ -45,6 +45,7 @@ int lengthOfColumnNumber = 3;
 int sideLength = 32;
 int cursorR = InvalidPosition, cursorC = InvalidPosition;
 int separate = 3;//辅助线间距，0无，在0,1,3,5切换
+int touchSign = 0;
 
 void DrawBlock(int r, int c, int isMine, int isOpen);
 void DrawLineA(int x0, int y0, int r, int angle);
@@ -246,8 +247,16 @@ int main()
 				}
 				if(mouseMsg.is_up())
 				{
-					if(mouseMsg.is_left()) operation = '@';
-					if(mouseMsg.is_right()) operation = '#';
+					if(touchSign)
+					{
+						if(mouseMsg.is_left()) operation = '#';
+						if(mouseMsg.is_right()) operation = '@';
+					}
+					else
+					{
+						if(mouseMsg.is_left()) operation = '@';
+						if(mouseMsg.is_right()) operation = '#';
+					}
 				}
 				if(mouseMsg.is_wheel() && keystate(key_control))//调整显示大小
 				{
@@ -316,6 +325,10 @@ int main()
 					else if(keyMsg.key == 'L')
 					{
 						ChangeSeparator();
+					}
+					else if(keyMsg.key == 'F')
+					{
+						touchSign = !touchSign;
 					}
 				}
 			}
@@ -403,6 +416,10 @@ int main()
 				else if(keyMsg.key == 'L')
 				{
 					ChangeSeparator();
+				}
+				else if(keyMsg.key == 'F')
+				{
+					touchSign = !touchSign;
 				}
 			}
 			delay_ms(RefreshCycle);
@@ -585,6 +602,11 @@ void DrawWindow(int mode, int mstime, color_t timeColor)
 		{
 			if(isOpen[r][c] == 2) remainder--;
 		}
+	}
+	if(touchSign)
+	{
+		setfillcolor(GOLD);
+		ege_fillrect(0, 0, sideLength, sideLength);
 	}
 	setcolor(RED);
 	setlinewidth(sideLength/16);
@@ -1899,6 +1921,7 @@ Easy Nonogram 0.9
 ——优化 刷新率从20Hz提高到40Hz
 ——优化 算法跟随Nonogram 0.10升级
 Easy Nonogram 0.10
+——新增 按F切换左右键，左上角显示当前状态
 ——优化 编译体积（使用新版EGE，自研EGE模块分离）
 ——优化 sys_edit回车不再响铃（自研EGE）
 --------------------------------*/
